@@ -1,0 +1,86 @@
+package com.example.loyaltyapp.ui.auth
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.loyaltyapp.core.result.AppResult
+import com.example.loyaltyapp.core.session.AttendantSession
+import com.example.loyaltyapp.data.repository.AuthRepository
+import com.example.loyaltyapp.data.repository.BootstrapRepository
+import com.example.loyaltyapp.sync.SyncScheduler
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class LoginUiState(
+    val employeeId: String = "",
+    val pin: String = "",
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val restoredSession: AttendantSession? = null,
+    val isRestoring: Boolean = true
+)
+
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val bootstrapRepository: BootstrapRepository,
+    private val syncScheduler: SyncScheduler
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(LoginUiState())
+    val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            syncScheduler.schedulePeriodicSync()
+            val existing = authRepository.currentSession()
+            val stillValid = existing != null && !authRepository.isSessionExpired()
+            if (stillValid) {
+                bootstrapRepository.refresh()
+                syncScheduler.requestImmediateCustomerDirectorySync()
+            } else if (existing != null) {
+                authRepository.signOut()
+            }
+            _uiState.update {
+                it.copy(restoredSession = if (stillValid) existing else null, isRestoring = false)
+            }
+        }
+    }
+
+    fun onEmployeeIdChange(value: String) {
+        _uiState.update { it.copy(employeeId = value, error = null) }
+    }
+
+    fun onPinChange(value: String) {
+        if (value.length <= 6 && value.all { it.isDigit() }) {
+            _uiState.update { it.copy(pin = value, error = null) }
+        }
+    }
+
+    fun login() {
+        val state = _uiState.value
+        if (state.employeeId.isBlank() || state.pin.isBlank()) {
+            _uiState.update { it.copy(error = "Enter your employee ID and PIN.") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            when (val result = authRepository.login(state.employeeId, state.pin)) {
+                is AppResult.Success -> {
+                    bootstrapRepository.refresh()
+                    syncScheduler.requestImmediateCustomerDirectorySync()
+                    _uiState.update {
+                        it.copy(isLoading = false, restoredSession = result.data)
+                    }
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(isLoading = false, error = result.message)
+                }
+            }
+        }
+    }
+}
