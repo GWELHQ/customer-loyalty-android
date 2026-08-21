@@ -186,13 +186,18 @@ data class CustomerRegistrationResponseDto(
 
 // ---- Daily summary / sales list -------------------------------------------
 
+// Real shape verified against the live server — a per-product reconciliation row, not a simple
+// attendant sale count/value pair as the field names might suggest.
 @Serializable
 data class DailySummaryRowDto(
     val stationId: String? = null,
     val date: String? = null,
     val product: String? = null,
-    val loyaltySalesCount: Int = 0,
-    val loyaltySalesValue: Double = 0.0
+    val loyaltySales: Double = 0.0,
+    val totalSales: Double = 0.0,
+    val headroom: Double = 0.0,
+    val percentage: Double = 0.0,
+    val status: String? = null
 )
 
 // Verified against the live server: a wrapper object, not a bare array.

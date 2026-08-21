@@ -84,14 +84,23 @@ private fun SummaryRow(row: DailySummaryRowDto) {
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(row.product ?: "All products", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            TabularText(Money.formatKes(java.math.BigDecimal(row.loyaltySalesValue.toString())), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+            TabularText(Money.formatKes(java.math.BigDecimal(row.loyaltySales.toString())), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
         }
         Text(
-            "${row.loyaltySalesCount} loyalty sale(s)",
+            "of ${Money.formatKes(java.math.BigDecimal(row.totalSales.toString()))} total station sales",
             color = ColorTextSecondary,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 4.dp)
         )
+        row.status?.let { status ->
+            Text(
+                status.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                color = if (status == "healthy") ColorTextSecondary else GwTheme.extended.warning,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
         // Deliberately no cashback total here either — see TodayViewModel's KDoc for why.
     }
 }

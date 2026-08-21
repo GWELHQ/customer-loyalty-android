@@ -1,5 +1,6 @@
 package com.example.loyaltyapp.ui.profile
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,9 +58,21 @@ fun ProfileScreen(
     val state by viewModel.uiState.collectAsState()
     var showSignOutWarning by remember { mutableStateOf(false) }
     val session = state.session
+    val context = LocalContext.current
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.syncToast.collect { toast ->
+            val message = when (toast) {
+                SyncToast.SYNCING -> "Syncing…"
+                SyncToast.SUCCESS -> "Sync Successful"
+                SyncToast.FAILED -> "Sync Failed"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(ColorBg)) {
@@ -109,7 +123,7 @@ fun ProfileScreen(
                 HealthRow("Connection", if (state.isOnline) "Online" else "Offline", ok = state.isOnline)
                 HealthRow("Sales still on this phone", state.pendingSyncCount.toString(), ok = state.pendingSyncCount == 0)
                 HealthRow("Prices", if (state.pricesUpToDate) "Up to date" else "Missing this month", ok = state.pricesUpToDate)
-                HealthRow("App version", "1.0.0", ok = true)
+                HealthRow("App version", com.example.loyaltyapp.BuildConfig.VERSION_NAME, ok = true)
                 Column(modifier = Modifier.padding(13.dp)) {
                     SecondaryButton(text = "Sync now", onClick = viewModel::syncNow, height = 44.dp)
                     Text(

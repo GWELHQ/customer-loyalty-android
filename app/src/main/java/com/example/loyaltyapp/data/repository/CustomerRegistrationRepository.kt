@@ -10,6 +10,8 @@ import com.example.loyaltyapp.data.remote.dto.CustomerRegistrationRequestDto
 import kotlinx.coroutines.flow.Flow
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,7 +32,8 @@ data class NewCustomerRegistrationInput(
 class CustomerRegistrationRepository @Inject constructor(
     private val registrationDao: CustomerRegistrationDao,
     private val mobileApi: MobileApi,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    private val saleRepository: SaleRepository
 ) {
     suspend fun submit(input: NewCustomerRegistrationInput): CustomerRegistrationEntity {
         val wasOnlineAtCapture = connectivityObserver.currentlyOnline()
@@ -95,4 +98,42 @@ class CustomerRegistrationRepository @Inject constructor(
     fun observeAll(): Flow<List<CustomerRegistrationEntity>> = registrationDao.observeAll()
 
     fun observePendingCount(): Flow<Int> = registrationDao.observePendingCount()
+
+    /**
+     * There's no `GET` endpoint for a registration's own status, so approval is detected
+     * indirectly: once a supervisor approves a request, the server creates a real sale sharing
+     * the registration's own `idempotencyKey`. This looks that sale up via `/mobile/sales/mine`
+     * (scoped per-day, so it's queried once per distinct day among still-SUBMITTED requests),
+     * adopts it into the local sales queue if found, and flips the registration to APPROVED.
+     * Returns the registrations that were newly found approved this call, for the caller to
+     * notify the attendant about.
+     */
+    suspend fun reconcileApprovals(): List<CustomerRegistrationEntity> {
+        if (!connectivityObserver.currentlyOnline()) return emptyList()
+        val submitted = registrationDao.getSubmitted()
+        if (submitted.isEmpty()) return emptyList()
+
+        val dates = submitted.map { it.capturedAtMillis.toServerDate() }.toSet()
+        val salesByIdempotencyKey = HashMap<String, com.example.loyaltyapp.data.remote.dto.SaleResponseDto>()
+        dates.forEach { date ->
+            try {
+                mobileApi.salesMine(date).items.forEach { salesByIdempotencyKey[it.idempotencyKey] = it }
+            } catch (_: Exception) {
+                // Best-effort — this day's lookup failed, try again on the next reconcile.
+            }
+        }
+
+        val newlyApproved = mutableListOf<CustomerRegistrationEntity>()
+        submitted.forEach { registration ->
+            val sale = salesByIdempotencyKey[registration.idempotencyKey] ?: return@forEach
+            saleRepository.adoptServerSale(sale, registration.customerFullName)
+            val approved = registration.copy(syncStatus = RegistrationSyncStatus.APPROVED)
+            registrationDao.update(approved)
+            newlyApproved.add(approved)
+        }
+        return newlyApproved
+    }
+
+    private fun Long.toServerDate(): String =
+        Instant.ofEpochMilli(this).atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ISO_LOCAL_DATE)
 }

@@ -12,6 +12,7 @@ import com.example.loyaltyapp.data.local.entity.SyncStatus
 import com.example.loyaltyapp.data.remote.NetworkErrors
 import com.example.loyaltyapp.data.remote.api.MobileApi
 import com.example.loyaltyapp.data.remote.dto.SaleRequestDto
+import com.example.loyaltyapp.data.remote.dto.SaleResponseDto
 import com.example.loyaltyapp.data.remote.dto.SyncRequestDto
 import kotlinx.coroutines.flow.Flow
 import retrofit2.HttpException
@@ -223,4 +224,39 @@ class SaleRepository @Inject constructor(
     fun observeQueue(): Flow<List<SaleEntity>> = saleDao.observeAll()
 
     fun observePendingCount(): Flow<Int> = saleDao.observePendingCount()
+
+    /**
+     * Adopts a sale the server created on our behalf (e.g. a customer-registration request that
+     * a supervisor approved) into the local queue, already SYNCED, so it shows up in "Today's
+     * sales" the same as one recorded directly on this phone. IGNORE on the unique
+     * idempotencyKey index means this is safe to call repeatedly for the same sale.
+     */
+    suspend fun adoptServerSale(response: SaleResponseDto, customerName: String) {
+        saleDao.insert(
+            SaleEntity(
+                localSaleId = response.id,
+                idempotencyKey = response.idempotencyKey,
+                serverSaleRef = response.id,
+                stationId = response.stationId,
+                stationName = response.stationNameAtSale,
+                attendantId = response.attendantId,
+                attendantName = response.attendantNameAtSale,
+                customerId = response.customerId,
+                customerName = customerName,
+                customerPhoneE164 = response.customerPhoneAtSale,
+                product = Product.valueOf(response.product),
+                amountPaidKes = BigDecimal.valueOf(response.amountPaid),
+                pricePerLitreSnapshot = BigDecimal.valueOf(response.snapshot.pricePerLitre),
+                cashbackRatePerLitreSnapshot = BigDecimal.valueOf(response.snapshot.cashbackRatePerLitre),
+                isSpecialRateSnapshot = response.specialRateIdAtSale != null,
+                litres = BigDecimal.valueOf(response.snapshot.litres),
+                wholeLitres = BigDecimal.valueOf(response.snapshot.wholeLitres.toDouble()),
+                cashbackKes = BigDecimal.valueOf(response.snapshot.cashbackEarned),
+                capturedAtMillis = runCatching { Instant.parse(response.saleDate).toEpochMilli() }.getOrDefault(System.currentTimeMillis()),
+                capturedOffline = false,
+                syncStatus = SyncStatus.SYNCED,
+                smsStatus = parseSmsStatus(response.smsStatus)
+            )
+        )
+    }
 }

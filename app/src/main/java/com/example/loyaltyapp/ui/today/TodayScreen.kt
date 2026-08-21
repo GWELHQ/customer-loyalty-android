@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +46,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     onGoNewSale: () -> Unit,
@@ -59,7 +62,12 @@ fun TodayScreen(
             connectionState = if (state.isOnline) ConnectionState.ONLINE else ConnectionState.OFFLINE
         )
 
-        Column(modifier = Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp)) {
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.weight(1f).fillMaxSize()
+        ) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp)) {
             Text("Today", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Text(
                 "${SimpleDateFormat("EEEE d MMMM yyyy", Locale.getDefault()).format(Date())} · ${state.stationName}",
@@ -109,6 +117,7 @@ fun TodayScreen(
                     state.sales.forEach { sale -> SaleRow(sale) }
                 }
             }
+        }
         }
 
         AppBottomNav(

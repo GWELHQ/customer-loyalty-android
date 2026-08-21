@@ -3,9 +3,11 @@ package com.example.loyaltyapp.ui.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.loyaltyapp.core.connectivity.ConnectivityObserver
+import com.example.loyaltyapp.core.notify.RegistrationApprovalNotifier
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.data.local.entity.SaleEntity
 import com.example.loyaltyapp.data.repository.AuthRepository
+import com.example.loyaltyapp.data.repository.CustomerRegistrationRepository
 import com.example.loyaltyapp.data.repository.SaleRepository
 import com.example.loyaltyapp.data.repository.StationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,12 +34,15 @@ data class TodayUiState(
     val loyaltySalesCount: Int = 0,
     val loyaltySalesValue: BigDecimal = BigDecimal.ZERO,
     val pmsValue: BigDecimal = BigDecimal.ZERO,
-    val agoValue: BigDecimal = BigDecimal.ZERO
+    val agoValue: BigDecimal = BigDecimal.ZERO,
+    val isRefreshing: Boolean = false
 )
 
 @HiltViewModel
 class TodayViewModel @Inject constructor(
     private val saleRepository: SaleRepository,
+    private val customerRegistrationRepository: CustomerRegistrationRepository,
+    private val registrationApprovalNotifier: RegistrationApprovalNotifier,
     private val authRepository: AuthRepository,
     private val stationRepository: StationRepository,
     private val connectivityObserver: ConnectivityObserver
@@ -74,6 +79,25 @@ class TodayViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Pull-to-refresh: checks whether any pending new-customer registration has since been
+     * approved (see `CustomerRegistrationRepository.reconcileApprovals`) and flushes any sales
+     * still waiting to sync, so both "stuck on pending approval" and "approved sale missing from
+     * Today" resolve without waiting for the next background sync.
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            try {
+                customerRegistrationRepository.reconcileApprovals()
+                    .forEach { registrationApprovalNotifier.notifyApproved(it) }
+                saleRepository.syncAllPending()
+            } finally {
+                _uiState.update { it.copy(isRefreshing = false) }
             }
         }
     }

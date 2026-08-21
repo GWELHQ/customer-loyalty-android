@@ -11,11 +11,14 @@ import com.example.loyaltyapp.data.repository.SaleRepository
 import com.example.loyaltyapp.data.repository.StationRepository
 import com.example.loyaltyapp.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,6 +31,8 @@ data class ProfileUiState(
     val pricesUpToDate: Boolean = true,
     val signedOut: Boolean = false
 )
+
+enum class SyncToast { SYNCING, SUCCESS, FAILED }
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
@@ -42,6 +47,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ProfileUiState(session = authRepository.currentSession()))
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    private val _syncToast = MutableSharedFlow<SyncToast>(extraBufferCapacity = 1)
+    val syncToast: SharedFlow<SyncToast> = _syncToast
 
     init {
         _uiState.value.session?.let { session ->
@@ -70,6 +78,22 @@ class ProfileViewModel @Inject constructor(
 
     fun syncNow() {
         syncScheduler.requestImmediateSync()
+        viewModelScope.launch {
+            _syncToast.emit(SyncToast.SYNCING)
+            if (!connectivityObserver.currentlyOnline()) {
+                _syncToast.emit(SyncToast.FAILED)
+                return@launch
+            }
+            try {
+                saleRepository.syncAllPending()
+                customerRegistrationRepository.retryAllPending()
+                val stillPending = saleRepository.observePendingCount().first() +
+                    customerRegistrationRepository.observePendingCount().first()
+                _syncToast.emit(if (stillPending == 0) SyncToast.SUCCESS else SyncToast.FAILED)
+            } catch (e: Exception) {
+                _syncToast.emit(SyncToast.FAILED)
+            }
+        }
     }
 
     /** True when it's safe to sign out without a warning — no sales still waiting on this device. */

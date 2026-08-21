@@ -19,5 +19,10 @@ enum class SyncStatus { PENDING, SYNCING, SYNCED, NEEDS_REVIEW, FAILED, CONFLICT
 /** Delivery status of the customer-facing cashback SMS, tracked independently of sale sync. */
 enum class SmsStatus { PENDING, SENT, FAILED, NOT_APPLICABLE }
 
-/** Sync lifecycle of a locally captured new-customer registration request. */
-enum class RegistrationSyncStatus { PENDING, SYNCING, SUBMITTED, FAILED }
+/**
+ * Sync lifecycle of a locally captured new-customer registration request.
+ * SUBMITTED: the server accepted the *request* — still pending a supervisor's approval.
+ * APPROVED: a supervisor approved it; the resulting sale has been adopted into the local
+ *           sales queue (see `SaleRepository.adoptServerSale`) so it shows up in Today's sales.
+ */
+enum class RegistrationSyncStatus { PENDING, SYNCING, SUBMITTED, APPROVED, FAILED }

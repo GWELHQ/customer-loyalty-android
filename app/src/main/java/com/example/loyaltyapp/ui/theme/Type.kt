@@ -2,18 +2,23 @@ package com.example.loyaltyapp.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.loyaltyapp.R
 
-// The design system uses Montserrat (display/headlines), Source Sans 3 (body) and IBM Plex
-// Mono (tabular figures). To keep the build fully offline-buildable this ships with system
-// font families that approximate the same weight/contrast; swap FontFamily.Default for a
-// bundled Montserrat/Source Sans 3 FontFamily and FontFamily.Monospace for IBM Plex Mono if you
-// add the font files under res/font.
-val DisplayFontFamily = FontFamily.SansSerif
-val BodyFontFamily = FontFamily.Default
-val MonoFontFamily = FontFamily.Monospace
+// DM Sans across the whole app — display, body and tabular figures alike.
+val DmSans = FontFamily(
+    Font(R.font.dm_sans_regular, FontWeight.Normal),
+    Font(R.font.dm_sans_medium, FontWeight.Medium),
+    Font(R.font.dm_sans_bold, FontWeight.Bold),
+    Font(R.font.dm_sans_extrabold, FontWeight.ExtraBold)
+)
+
+val DisplayFontFamily = DmSans
+val BodyFontFamily = DmSans
+val MonoFontFamily = DmSans
 
 /** Use for money, litres, timestamps, sale IDs — anything that should align in a column. */
 val TabularNumbersStyle = TextStyle(fontFamily = MonoFontFamily, fontFeatureSettings = "tnum")

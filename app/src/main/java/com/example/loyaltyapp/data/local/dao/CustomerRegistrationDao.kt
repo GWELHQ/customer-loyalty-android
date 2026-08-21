@@ -24,6 +24,9 @@ interface CustomerRegistrationDao {
     @Query("SELECT * FROM customer_registrations WHERE syncStatus IN ('PENDING', 'FAILED') ORDER BY capturedAtMillis ASC")
     suspend fun getPending(): List<CustomerRegistrationEntity>
 
+    @Query("SELECT * FROM customer_registrations WHERE syncStatus = 'SUBMITTED' ORDER BY capturedAtMillis ASC")
+    suspend fun getSubmitted(): List<CustomerRegistrationEntity>
+
     @Query("SELECT * FROM customer_registrations ORDER BY capturedAtMillis DESC")
     fun observeAll(): Flow<List<CustomerRegistrationEntity>>
 
