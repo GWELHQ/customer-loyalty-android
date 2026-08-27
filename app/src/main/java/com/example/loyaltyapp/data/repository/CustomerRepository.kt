@@ -139,7 +139,7 @@ class CustomerRepository @Inject constructor(
             specialRateEffectiveTo = specialRateEffectiveTo?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
             totalCashbackEarned = java.math.BigDecimal(totalCashbackEarned.toString()),
             updatedAtMillis = updatedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: now,
-            licensePlateNumber = licensePlateNumber,
+            licensePlateNumbers = licensePlateNumbers,
             nfcTagId = nfcTagId
         )
     }

@@ -22,7 +22,7 @@ import com.example.loyaltyapp.data.local.entity.StationEntity
         SaleEntity::class,
         CustomerRegistrationEntity::class
     ],
-    version = 3,
+    version = 4, // licensePlateNumber (String?) -> licensePlateNumbers (List<String>); destructive migration wipes and re-syncs the cheap customer cache
     exportSchema = false
 )
 @TypeConverters(Converters::class)

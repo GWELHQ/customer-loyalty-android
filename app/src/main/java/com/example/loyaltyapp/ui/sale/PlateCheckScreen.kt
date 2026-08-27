@@ -128,7 +128,10 @@ fun PlateCheckScreen(
                             // simply has no plate on file yet — this makes that visible instead
                             // of leaving "not confirmed" looking like a bad OCR read.
                             Text(
-                                "On file: " + (state.customer?.licensePlateNumber ?: "none on file for this customer"),
+                                "On file: " + (state.customer?.licensePlateNumbers
+                                    ?.takeIf { it.isNotEmpty() }
+                                    ?.joinToString(", ")
+                                    ?: "none on file for this customer"),
                                 color = ColorTextSecondary,
                                 fontSize = 13.sp
                             )

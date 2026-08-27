@@ -80,9 +80,11 @@ data class CustomerDto(
     val source: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
-    // Absent means "not set," not an error — plate/NFC lookup are optional per-customer extras
-    // added by staff from the web admin, with no in-app registration flow for either.
-    val licensePlateNumber: String? = null,
+    // A customer can have more than one vehicle on file (family car + motorcycle, etc.); absent
+    // or [] means none set. nfcTagId is likewise absent, not an error, when no tag is assigned.
+    // Both are optional per-customer extras added by staff from the web admin, with no in-app
+    // registration flow for either.
+    val licensePlateNumbers: List<String> = emptyList(),
     val nfcTagId: String? = null
 )
 
