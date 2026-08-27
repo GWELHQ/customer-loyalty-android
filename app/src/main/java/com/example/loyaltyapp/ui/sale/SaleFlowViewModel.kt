@@ -206,8 +206,15 @@ class SaleFlowViewModel @Inject constructor(
         _uiState.update { it.copy(screen = SaleScreen.NFC_SCAN, scanError = null) }
     }
 
-    /** [scannedId] is the QR code's raw payload — the customer's own id, plain text (handover doc §2). */
-    fun onQrCodeScanned(scannedId: String) {
+    /**
+     * [scannedText] is the QR code's raw payload. As of 2026-08-27 this is a full URL
+     * (`https://loyalty-points-413d5.web.app/qr/<customerId>`, so a generic QR scanner lands
+     * somewhere useful instead of a bare id) rather than the old plain-id payload — the customer
+     * id is always everything after the last `/`, which also happens to be a no-op on the old
+     * bare-id format (no slashes), so no format detection is needed (handover doc §4).
+     */
+    fun onQrCodeScanned(scannedText: String) {
+        val scannedId = scannedText.substringAfterLast('/')
         viewModelScope.launch {
             val customer = customerRepository.findById(scannedId)
             if (customer != null) {
