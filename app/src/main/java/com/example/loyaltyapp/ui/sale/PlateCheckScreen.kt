@@ -91,11 +91,11 @@ fun PlateCheckScreen(
     ) {
         Column {
             Text("Vehicle plate photo", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-            Text(
-                "Optional — photograph the vehicle's number plate for audit. This never blocks the sale.",
-                color = ColorTextSecondary,
-                fontSize = 13.sp
-            )
+//            Text(
+//                "Optional — photograph the vehicle's number plate for audit. This never blocks the sale.",
+//                color = ColorTextSecondary,
+//                fontSize = 13.sp
+//            )
         }
 
         val result = state.plateCheck
@@ -200,9 +200,9 @@ fun PlateCheckScreen(
             }
         }
 
-        if (result == null && !state.isSubmittingPlateCheck && !state.plateCheckFailed) {
-            SecondaryButton(text = "Skip", onClick = onSkip)
-        }
+//        if (result == null && !state.isSubmittingPlateCheck && !state.plateCheckFailed) {
+//            SecondaryButton(text = "Skip", onClick = onSkip)
+//        }
     }
 }
 
