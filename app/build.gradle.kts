@@ -49,7 +49,7 @@ android {
         // Same Cloud Run backend as release — works from the emulator and any physical device
         // over plain internet, no dev-machine IP or same-Wi-Fi requirement. Swap to
         // "http://10.0.2.2:8080/api/v1/" (emulator only) if you need to hit a local backend.
-        buildConfigField("String", "API_BASE_URL", "\"https://loyalty-api-220192479053.us-central1.run.app/api/v1/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://loyalty-api-1092254911440.us-central1.run.app/api/v1/\"")
 
         // Same live Africa's Talking account in every build type — this is a real production
         // integration, not a dev-only stub (see AfricasTalkingSmsSender).
@@ -77,7 +77,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://loyalty-api-220192479053.us-central1.run.app/api/v1/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://loyalty-api-1092254911440.us-central1.run.app/api/v1/\"")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
