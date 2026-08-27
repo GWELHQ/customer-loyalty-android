@@ -6,6 +6,7 @@ import com.example.loyaltyapp.core.session.SessionManager
 import com.example.loyaltyapp.data.remote.NetworkErrors
 import com.example.loyaltyapp.data.remote.api.AuthApi
 import com.example.loyaltyapp.data.remote.dto.LoginRequestDto
+import com.example.loyaltyapp.data.remote.dto.NfcLoginRequestDto
 import kotlinx.coroutines.flow.StateFlow
 import retrofit2.HttpException
 import java.io.IOException
@@ -30,6 +31,25 @@ class AuthRepository @Inject constructor(
             AppResult.Success(sessionManager.currentSession()!!)
         } catch (e: HttpException) {
             AppResult.Failure(NetworkErrors.messageFor(e, "Could not sign in. Check your employee ID and PIN."), e)
+        } catch (e: IOException) {
+            AppResult.Failure("Could not reach the office. Check your connection and try again.", e)
+        } catch (e: Exception) {
+            AppResult.Failure("Something went wrong signing in. Please try again.", e)
+        }
+    }
+
+    /**
+     * Badge tap login (handover doc §3.1b) — same session type/TTL as PIN login, just a second
+     * way to obtain one. Deliberately weaker than a PIN (tag UID alone is the credential); the
+     * server is the sole gatekeeper on whether a tag is currently assigned to an active attendant.
+     */
+    suspend fun loginWithNfcTag(tagId: String): AppResult<AttendantSession> {
+        return try {
+            val dto = authApi.nfcLogin(NfcLoginRequestDto(tagId = tagId))
+            sessionManager.save(dto, capturedAtMillis = System.currentTimeMillis())
+            AppResult.Success(sessionManager.currentSession()!!)
+        } catch (e: HttpException) {
+            AppResult.Failure(NetworkErrors.messageFor(e, "Badge not recognized. Contact your supervisor, or sign in with your employee ID and PIN."), e)
         } catch (e: IOException) {
             AppResult.Failure("Could not reach the office. Check your connection and try again.", e)
         } catch (e: Exception) {

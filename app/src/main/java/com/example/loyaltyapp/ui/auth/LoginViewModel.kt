@@ -15,13 +15,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Two independent ways to obtain the same kind of attendant session (handover doc §3.1/§3.1b) — never mutually exclusive, just a UI toggle. */
+enum class LoginMode { PIN, BADGE }
+
 data class LoginUiState(
     val employeeId: String = "",
     val pin: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
     val restoredSession: AttendantSession? = null,
-    val isRestoring: Boolean = true
+    val isRestoring: Boolean = true,
+    val loginMode: LoginMode = LoginMode.PIN
 )
 
 @HiltViewModel
@@ -40,8 +44,7 @@ class LoginViewModel @Inject constructor(
             val existing = authRepository.currentSession()
             val stillValid = existing != null && !authRepository.isSessionExpired()
             if (stillValid) {
-                bootstrapRepository.refresh()
-                syncScheduler.requestImmediateCustomerDirectorySync()
+                afterSuccessfulLogin()
             } else if (existing != null) {
                 authRepository.signOut()
             }
@@ -61,6 +64,10 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun setLoginMode(mode: LoginMode) {
+        _uiState.update { it.copy(loginMode = mode, error = null) }
+    }
+
     fun login() {
         val state = _uiState.value
         if (state.employeeId.isBlank() || state.pin.isBlank()) {
@@ -71,16 +78,39 @@ class LoginViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = authRepository.login(state.employeeId, state.pin)) {
                 is AppResult.Success -> {
-                    bootstrapRepository.refresh()
-                    syncScheduler.requestImmediateCustomerDirectorySync()
-                    _uiState.update {
-                        it.copy(isLoading = false, restoredSession = result.data)
-                    }
+                    afterSuccessfulLogin()
+                    _uiState.update { it.copy(isLoading = false, restoredSession = result.data) }
                 }
                 is AppResult.Failure -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
                 }
             }
         }
+    }
+
+    /**
+     * Badge tap login (handover doc §3.1b). Guarded on [LoginUiState.isLoading] so a badge held
+     * against the reader for a moment too long doesn't fire a second overlapping request — the
+     * NFC reader keeps delivering tag reads for as long as it's held there.
+     */
+    fun loginWithBadge(tagId: String) {
+        if (_uiState.value.isLoading) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            when (val result = authRepository.loginWithNfcTag(tagId)) {
+                is AppResult.Success -> {
+                    afterSuccessfulLogin()
+                    _uiState.update { it.copy(isLoading = false, restoredSession = result.data) }
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(isLoading = false, error = result.message)
+                }
+            }
+        }
+    }
+
+    private suspend fun afterSuccessfulLogin() {
+        bootstrapRepository.refresh()
+        syncScheduler.requestImmediateCustomerDirectorySync()
     }
 }

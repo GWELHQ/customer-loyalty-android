@@ -8,6 +8,7 @@ import com.example.loyaltyapp.data.remote.dto.CustomerRegistrationResponseDto
 import com.example.loyaltyapp.data.remote.dto.DailySummaryResponseDto
 import com.example.loyaltyapp.data.remote.dto.LoginRequestDto
 import com.example.loyaltyapp.data.remote.dto.LoginResponseDto
+import com.example.loyaltyapp.data.remote.dto.NfcLoginRequestDto
 import com.example.loyaltyapp.data.remote.dto.PagedSalesDto
 import com.example.loyaltyapp.data.remote.dto.PriceDto
 import com.example.loyaltyapp.data.remote.dto.SaleRequestDto
@@ -29,10 +30,14 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** Attendant PIN login — the only unauthenticated mobile route. */
+/** Attendant login — the only unauthenticated mobile routes. */
 interface AuthApi {
     @POST("auth/attendant/login")
     suspend fun login(@Body request: LoginRequestDto): LoginResponseDto
+
+    /** Badge tap login (handover doc §3.1b) — same response shape/session as PIN login, tap-only, no PIN. */
+    @POST("auth/attendant/nfc-login")
+    suspend fun nfcLogin(@Body request: NfcLoginRequestDto): LoginResponseDto
 }
 
 /**

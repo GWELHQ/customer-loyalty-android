@@ -11,6 +11,12 @@ data class LoginRequestDto(
     val pin: String
 )
 
+/** Badge tap login (handover doc §3.1b) — tagId is the raw UID read off the tapped badge, normalized server-side. */
+@Serializable
+data class NfcLoginRequestDto(
+    val tagId: String
+)
+
 @Serializable
 data class AttendantDto(
     val kind: String = "attendant",
