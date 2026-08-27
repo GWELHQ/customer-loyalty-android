@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug-only: allows cleartext HTTP to the local dev backend (10.0.2.2 = emulator's alias
-     for the host machine). Never merged into release builds. -->
+<!-- Debug-only: allows cleartext HTTP to a local dev backend (10.0.2.2 = emulator's alias for
+     the host machine), for when API_BASE_URL in build.gradle.kts is swapped away from the
+     cloud backend. Never merged into release builds. -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">10.0.2.2</domain>

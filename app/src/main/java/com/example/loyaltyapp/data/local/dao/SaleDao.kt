@@ -24,6 +24,9 @@ interface SaleDao {
     @Query("SELECT * FROM sales WHERE localSaleId = :localSaleId")
     suspend fun getById(localSaleId: String): SaleEntity?
 
+    @Query("SELECT * FROM sales WHERE localSaleId = :localSaleId")
+    fun observeById(localSaleId: String): Flow<SaleEntity?>
+
     @Query("SELECT * FROM sales WHERE idempotencyKey = :idempotencyKey")
     suspend fun getByIdempotencyKey(idempotencyKey: String): SaleEntity?
 

@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.loyaltyapp.data.local.entity.RegistrationSyncStatus
 import com.example.loyaltyapp.data.local.entity.SmsStatus
 import com.example.loyaltyapp.data.local.entity.SyncStatus
 import com.example.loyaltyapp.ui.theme.GwTheme
@@ -66,6 +67,20 @@ fun SmsStatus.toDisplayLabel(): String = when (this) {
     SmsStatus.PENDING -> "SMS waiting"
     SmsStatus.FAILED -> "SMS failed"
     SmsStatus.NOT_APPLICABLE -> "No SMS"
+}
+
+fun RegistrationSyncStatus.toPillTone(): PillTone = when (this) {
+    RegistrationSyncStatus.APPROVED -> PillTone.OK
+    RegistrationSyncStatus.PENDING, RegistrationSyncStatus.SYNCING, RegistrationSyncStatus.SUBMITTED -> PillTone.WARN
+    RegistrationSyncStatus.FAILED -> PillTone.BAD
+}
+
+fun RegistrationSyncStatus.toDisplayLabel(): String = when (this) {
+    RegistrationSyncStatus.PENDING -> "Saved on phone"
+    RegistrationSyncStatus.SYNCING -> "Submitting…"
+    RegistrationSyncStatus.SUBMITTED -> "Pending approval"
+    RegistrationSyncStatus.APPROVED -> "Approved"
+    RegistrationSyncStatus.FAILED -> "Submit failed"
 }
 
 /** Small colored dot, used inside the connection pill in the top bar. */

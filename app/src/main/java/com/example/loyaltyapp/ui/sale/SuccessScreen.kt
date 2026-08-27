@@ -9,14 +9,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.loyaltyapp.core.money.Money
 import com.example.loyaltyapp.data.local.entity.Product
+import com.example.loyaltyapp.data.local.entity.RegistrationSyncStatus
 import com.example.loyaltyapp.data.local.entity.SmsStatus
 import com.example.loyaltyapp.ui.components.MoneyText
 import com.example.loyaltyapp.ui.components.PrimaryButton
@@ -45,11 +51,19 @@ import com.example.loyaltyapp.ui.theme.GwTheme
 fun SuccessScreen(
     state: SaleUiState,
     onRecordAnother: () -> Unit,
-    onGoToday: () -> Unit
+    onGoToday: () -> Unit,
+    onRefreshRegistration: () -> Unit = {}
 ) {
     val registration = state.lastRegistration
     if (registration != null) {
-        RegistrationSuccessScreen(registration, state.lastSaleWasOffline, onRecordAnother, onGoToday)
+        RegistrationSuccessScreen(
+            registration,
+            state.lastSaleWasOffline,
+            state.isRefreshingRegistration,
+            onRefreshRegistration,
+            onRecordAnother,
+            onGoToday
+        )
         return
     }
     val sale = state.lastSale ?: return
@@ -130,40 +144,59 @@ fun SuccessScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RegistrationSuccessScreen(
     registration: com.example.loyaltyapp.data.local.entity.CustomerRegistrationEntity,
     offline: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onRecordAnother: () -> Unit,
     onGoToday: () -> Unit
 ) {
+    val approved = registration.syncStatus == RegistrationSyncStatus.APPROVED
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+    // PullToRefreshBox detects the pull gesture via nested scroll deltas bubbling up from its
+    // content — a static, non-scrolling Column never reports those deltas, so the gesture
+    // silently never fires. verticalScroll() is required here even though the content is short.
     Column(
-        modifier = Modifier.fillMaxWidth().padding(14.dp),
+        modifier = Modifier.fillMaxWidth().fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .background(GwTheme.extended.warningTint, CircleShape),
+                    .background(if (approved) GwTheme.extended.successTint else GwTheme.extended.warningTint, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (offline) Icons.Filled.Upload else Icons.Filled.HourglassTop,
+                    imageVector = when {
+                        approved -> Icons.Filled.CheckCircle
+                        offline -> Icons.Filled.Upload
+                        else -> Icons.Filled.HourglassTop
+                    },
                     contentDescription = null,
-                    tint = GwTheme.extended.warning,
+                    tint = if (approved) GwTheme.extended.success else GwTheme.extended.warning,
                     modifier = Modifier.size(32.dp)
                 )
             }
             Text(
-                "Pending supervisor approval",
+                if (approved) "Approved" else "Pending supervisor approval",
                 style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = 12.dp)
             )
             Text(
-                if (offline)
-                    "Saved on this device — will submit for approval once there is network. This is not a confirmed sale yet."
-                else "This is not a confirmed sale yet — a supervisor must approve the new customer and this sale together.",
+                when {
+                    approved -> "A supervisor approved this new customer and sale. It now shows in Today's sales."
+                    offline -> "Saved on this device — will submit for approval once there is network. This is not a confirmed sale yet."
+                    else -> "This is not a confirmed sale yet — a supervisor must approve the new customer and this sale together. Pull down to check for an update."
+                },
                 color = ColorTextSecondary,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -206,11 +239,17 @@ private fun RegistrationSuccessScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Status", color = ColorTextSecondary, fontSize = 13.sp)
-                Text("Pending approval", color = GwTheme.extended.warning, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(
+                    if (approved) "Approved" else "Pending approval",
+                    color = if (approved) GwTheme.extended.success else GwTheme.extended.warning,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
             }
         }
 
         PrimaryButton(text = "Record another sale", onClick = onRecordAnother, height = 52.dp)
         SecondaryButton(text = "Go to today's sales", onClick = onGoToday, height = 46.dp)
+    }
     }
 }

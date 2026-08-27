@@ -5,8 +5,9 @@ import com.example.loyaltyapp.data.local.entity.CustomerRegistrationEntity
 import com.example.loyaltyapp.data.local.entity.PriceEntity
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.data.local.entity.SaleEntity
+import com.example.loyaltyapp.data.repository.VehiclePlateCheckResult
 
-enum class SaleScreen { LOOKUP, CREATE, BLOCKED, ENTRY, REVIEW, SUCCESS }
+enum class SaleScreen { LOOKUP, QR_SCAN, NFC_SCAN, CREATE, BLOCKED, PLATE_CHECK, ENTRY, REVIEW, SUCCESS }
 
 data class SaleUiState(
     val screen: SaleScreen = SaleScreen.LOOKUP,
@@ -23,6 +24,15 @@ data class SaleUiState(
     val searchedEnough: Boolean = false,
     /** True once a full 9-digit number has been checked against the live server and found nothing. */
     val confirmedNotFound: Boolean = false,
+    /** True when a full-number lookup couldn't reach the server (while online) — distinct from a confirmed "not found", so we never route the attendant to create a duplicate. */
+    val lookupFailed: Boolean = false,
+    /** Set when a QR/NFC scan didn't resolve to a customer (not found, or the office couldn't be reached) — shown back on LOOKUP. */
+    val scanError: String? = null,
+
+    val plateCheck: VehiclePlateCheckResult? = null,
+    val isSubmittingPlateCheck: Boolean = false,
+    /** True when a submitted plate photo couldn't be checked (offline, upload failure, server error) — shown so the attendant/tester isn't left guessing why nothing appeared. */
+    val plateCheckFailed: Boolean = false,
 
     val newCustomerName: String = "",
     val createError: String? = null,
@@ -39,7 +49,8 @@ data class SaleUiState(
     val isSubmitting: Boolean = false,
     val lastSale: SaleEntity? = null,
     val lastRegistration: CustomerRegistrationEntity? = null,
-    val lastSaleWasOffline: Boolean = false
+    val lastSaleWasOffline: Boolean = false,
+    val isRefreshingRegistration: Boolean = false
 ) {
     /**
      * [queryDigits] as typed may or may not carry a leading 0 (07…/01… vs 7…/1…) — this strips
@@ -73,11 +84,4 @@ data class SaleUiState(
     val readyForReview: Boolean
         get() = (customer != null || isNewCustomerRegistration) && product != null &&
             amountPaid > java.math.BigDecimal.ZERO && !blockedNoPrice
-
-    val entryBlockReason: String?
-        get() = when {
-            product == null -> "Choose Petrol or Diesel to continue."
-            amountPaid <= java.math.BigDecimal.ZERO -> "Enter the amount the customer paid."
-            else -> null
-        }
 }

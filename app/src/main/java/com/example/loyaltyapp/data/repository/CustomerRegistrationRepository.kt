@@ -78,6 +78,22 @@ class CustomerRegistrationRepository @Inject constructor(
             )
             registrationDao.update(updated)
             updated
+        } catch (e: retrofit2.HttpException) {
+            // A 409/422 here almost always means the office already has this phone number as a
+            // customer — the local "not found" check that routed the attendant here can be stale
+            // (see [com.example.loyaltyapp.ui.sale.SaleFlowViewModel.checkFullNumberIfNeeded]).
+            // Surface the server's own message rather than a generic offline one, since retrying
+            // this exact request will never succeed.
+            val updated = registration.copy(
+                syncStatus = RegistrationSyncStatus.FAILED,
+                lastSyncErrorMessage = com.example.loyaltyapp.data.remote.NetworkErrors.messageFor(
+                    e,
+                    fallback = "The office found a problem with this registration. See your supervisor."
+                ),
+                syncAttempts = registration.syncAttempts + 1
+            )
+            registrationDao.update(updated)
+            updated
         } catch (e: Exception) {
             val updated = registration.copy(
                 syncStatus = RegistrationSyncStatus.FAILED,
@@ -95,7 +111,14 @@ class CustomerRegistrationRepository @Inject constructor(
         registrationDao.getPending().forEach { attemptSync(it) }
     }
 
+    suspend fun getById(localId: String): CustomerRegistrationEntity? = registrationDao.getById(localId)
+
+    fun observeById(localId: String): Flow<CustomerRegistrationEntity?> = registrationDao.observeById(localId)
+
     fun observeAll(): Flow<List<CustomerRegistrationEntity>> = registrationDao.observeAll()
+
+    fun observeTodayUnapproved(startOfDayMillis: Long): Flow<List<CustomerRegistrationEntity>> =
+        registrationDao.observeTodayUnapproved(startOfDayMillis)
 
     fun observePendingCount(): Flow<Int> = registrationDao.observePendingCount()
 

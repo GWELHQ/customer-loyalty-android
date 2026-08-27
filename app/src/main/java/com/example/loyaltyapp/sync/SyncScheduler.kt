@@ -32,11 +32,11 @@ class SyncScheduler @Inject constructor(
             .build()
         workManager.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
 
-        // A full directory sweep is ~2000 rate-limited lookups, done in ~400-prefix chunks per
-        // run (see CustomerRepository.refreshFullDirectory) — a 30-minute cadence gets a fresh
-        // install through a first full pass in a couple of hours without threatening the
-        // documented 120-req/60s API limit.
-        val customerRefreshRequest = PeriodicWorkRequestBuilder<CustomerRefreshWorker>(30, TimeUnit.MINUTES)
+        // A sync is one or two paginated GET /mobile/customers calls (see
+        // CustomerRepository.syncCustomers — full pull once, `updatedSince` incremental after
+        // that), so a 15-minute cadence is cheap and keeps admin-side edits (e.g. a customer's
+        // plate number) from being stale on the phone for long.
+        val customerRefreshRequest = PeriodicWorkRequestBuilder<CustomerRefreshWorker>(15, TimeUnit.MINUTES)
             .setConstraints(networkConstraints)
             .setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)
             .build()

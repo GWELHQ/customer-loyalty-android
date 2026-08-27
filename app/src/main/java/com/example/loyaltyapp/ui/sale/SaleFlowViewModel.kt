@@ -3,6 +3,7 @@ package com.example.loyaltyapp.ui.sale
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.loyaltyapp.core.connectivity.ConnectivityObserver
+import com.example.loyaltyapp.core.notify.RegistrationApprovalNotifier
 import com.example.loyaltyapp.core.phone.PhoneNumber
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.data.repository.AuthRepository
@@ -13,7 +14,9 @@ import com.example.loyaltyapp.data.repository.NewSaleInput
 import com.example.loyaltyapp.data.repository.PriceRepository
 import com.example.loyaltyapp.data.repository.SaleRepository
 import com.example.loyaltyapp.data.repository.StationRepository
+import com.example.loyaltyapp.data.repository.VehiclePlateCheckRepository
 import com.example.loyaltyapp.sync.SyncScheduler
+import java.io.File
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,9 +35,11 @@ class SaleFlowViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val customerRepository: CustomerRepository,
     private val customerRegistrationRepository: CustomerRegistrationRepository,
+    private val registrationApprovalNotifier: RegistrationApprovalNotifier,
     private val stationRepository: StationRepository,
     private val priceRepository: PriceRepository,
     private val saleRepository: SaleRepository,
+    private val vehiclePlateCheckRepository: VehiclePlateCheckRepository,
     private val connectivityObserver: ConnectivityObserver,
     private val syncScheduler: SyncScheduler
 ) : ViewModel() {
@@ -71,6 +76,9 @@ class SaleFlowViewModel @Inject constructor(
                 if (online) {
                     priceRepository.refreshFromRemote()
                     loadPrices()
+                    // A prior full-number lookup couldn't reach the server — now that we're back
+                    // online, retry it automatically rather than leaving the attendant stuck.
+                    if (_uiState.value.lookupFailed) checkFullNumberIfNeeded()
                 }
             }
         }
@@ -129,17 +137,17 @@ class SaleFlowViewModel @Inject constructor(
             // the cap only widens to 10 once a leading 0 is actually present (see maxQueryDigits).
             if (s.queryDigits.length >= s.maxQueryDigits) return@update s
             val newDigits = s.queryDigits + digit
-            s.copy(queryDigits = newDigits, searchedEnough = newDigits.isNotEmpty(), confirmedNotFound = false)
+            s.copy(queryDigits = newDigits, searchedEnough = newDigits.isNotEmpty(), confirmedNotFound = false, lookupFailed = false)
         }
         checkFullNumberIfNeeded()
     }
 
     fun onQueryBackspace() {
-        _uiState.update { it.copy(queryDigits = it.queryDigits.dropLast(1), confirmedNotFound = false) }
+        _uiState.update { it.copy(queryDigits = it.queryDigits.dropLast(1), confirmedNotFound = false, lookupFailed = false) }
     }
 
     fun clearQuery() {
-        _uiState.update { it.copy(queryDigits = "", searchedEnough = false, confirmedNotFound = false) }
+        _uiState.update { it.copy(queryDigits = "", searchedEnough = false, confirmedNotFound = false, lookupFailed = false) }
     }
 
     /**
@@ -161,29 +169,113 @@ class SaleFlowViewModel @Inject constructor(
             val cachedLocally = normalized?.let { customerRepository.findByPhone(it.e164) } != null
             if (cachedLocally) return@launch
 
+            val wasOnline = connectivityObserver.currentlyOnline()
             val remote = customerRepository.searchRemoteExact(national)
             val stillCurrent = _uiState.value.queryDigits == digits
-            if (stillCurrent) {
-                val notFound = when {
-                    remote != null -> remote.isEmpty()
-                    else -> _uiState.value.matches.isEmpty() // offline: fall back to local cache
+            if (!stillCurrent) return@launch
+
+            when {
+                remote != null -> _uiState.update { it.copy(confirmedNotFound = remote.isEmpty(), lookupFailed = false) }
+                !wasOnline -> _uiState.update {
+                    // Genuinely offline: fall back to whatever the local cache already knows.
+                    it.copy(confirmedNotFound = it.matches.isEmpty(), lookupFailed = false)
                 }
-                _uiState.update { it.copy(confirmedNotFound = notFound) }
+                else -> {
+                    // Online, but the lookup call itself failed (timeout, 5xx, rate limit, ...).
+                    // Never claim "not found" here — that would route a real customer into a
+                    // duplicate "create" registration. Surface a distinct retryable error instead.
+                    _uiState.update { it.copy(confirmedNotFound = false, lookupFailed = true) }
+                }
             }
         }
     }
 
+    /** Manual retry for a full-number lookup that previously failed (see [SaleUiState.lookupFailed]). */
+    fun retryLookup() = checkFullNumberIfNeeded()
+
     fun pickCustomer(customerId: String) {
         val customer = _uiState.value.matches.firstOrNull { it.id == customerId } ?: return
+        selectCustomer(customer)
+    }
+
+    fun goQrScan() {
+        _uiState.update { it.copy(screen = SaleScreen.QR_SCAN, scanError = null) }
+    }
+
+    fun goNfcScan() {
+        _uiState.update { it.copy(screen = SaleScreen.NFC_SCAN, scanError = null) }
+    }
+
+    /** [scannedId] is the QR code's raw payload — the customer's own id, plain text (handover doc §2). */
+    fun onQrCodeScanned(scannedId: String) {
+        viewModelScope.launch {
+            val customer = customerRepository.findById(scannedId)
+            if (customer != null) {
+                selectCustomer(customer)
+            } else {
+                _uiState.update { it.copy(screen = SaleScreen.LOOKUP, scanError = "That QR code didn't match a customer. Try again or use the phone number.") }
+            }
+        }
+    }
+
+    fun onNfcTagRead(tagId: String) {
+        viewModelScope.launch {
+            val customer = customerRepository.findByNfcTag(tagId)
+            if (customer != null) {
+                selectCustomer(customer)
+            } else {
+                _uiState.update { it.copy(screen = SaleScreen.LOOKUP, scanError = "That tag isn't assigned to a customer. Try again or use the phone number.") }
+            }
+        }
+    }
+
+    private fun selectCustomer(customer: com.example.loyaltyapp.data.local.entity.CustomerEntity) {
         _uiState.update {
             it.copy(
                 customer = customer,
                 isNewCustomerRegistration = false,
-                screen = SaleScreen.ENTRY,
+                screen = SaleScreen.PLATE_CHECK,
+                plateCheck = null,
+                plateCheckFailed = false,
                 product = null,
                 amountDigits = ""
             )
         }
+    }
+
+    // --- Vehicle plate check --------------------------------------------
+
+    /**
+     * Never blocks the sale on its own — a failed/offline check just means no plateCheckId is
+     * carried into the sale — but unlike a mismatch (a *completed* check the attendant should be
+     * able to see and move past), a check that couldn't run at all is surfaced explicitly
+     * ([SaleUiState.plateCheckFailed]) rather than silently continuing to ENTRY: this attendant
+     * still needs to *notice* it never got a result, especially while the office side of this
+     * feature is being brought up.
+     */
+    fun submitPlateCheck(imageFile: File) {
+        val customer = _uiState.value.customer ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSubmittingPlateCheck = true, plateCheckFailed = false) }
+            val result = vehiclePlateCheckRepository.submit(imageFile, customer.id)
+            _uiState.update {
+                it.copy(isSubmittingPlateCheck = false, plateCheck = result, plateCheckFailed = result == null)
+            }
+            imageFile.delete()
+        }
+    }
+
+    fun skipPlateCheck() {
+        _uiState.update { it.copy(screen = SaleScreen.ENTRY, plateCheck = null, plateCheckFailed = false) }
+    }
+
+    /** Re-shoot the photo without leaving the plate-check step — offered both after a completed mismatch and after a failed check. */
+    fun retryPlateCheck() {
+        _uiState.update { it.copy(plateCheck = null, plateCheckFailed = false) }
+    }
+
+    fun continueAfterPlateCheck() {
+        _uiState.update { it.copy(screen = SaleScreen.ENTRY) }
     }
 
     fun goCreate() {
@@ -215,7 +307,7 @@ class SaleFlowViewModel @Inject constructor(
     }
 
     fun goLookup() {
-        _uiState.update { it.copy(screen = SaleScreen.LOOKUP) }
+        _uiState.update { it.copy(screen = SaleScreen.LOOKUP, plateCheck = null, plateCheckFailed = false, scanError = null) }
     }
 
     // --- Product + amount -----------------------------------------------
@@ -296,7 +388,8 @@ class SaleFlowViewModel @Inject constructor(
                     customer = customer,
                     product = product,
                     amountPaidKes = state.amountPaid,
-                    pricePerLitre = price.pricePerLitre
+                    pricePerLitre = price.pricePerLitre,
+                    plateCheckId = state.plateCheck?.id
                 )
             )
             syncScheduler.requestImmediateSync()
@@ -323,8 +416,32 @@ class SaleFlowViewModel @Inject constructor(
                 product = null,
                 amountDigits = "",
                 lastSale = null,
-                lastRegistration = null
+                lastRegistration = null,
+                plateCheck = null,
+                plateCheckFailed = false,
+                scanError = null
             )
+        }
+    }
+
+    /**
+     * Pull-to-refresh on the pending-approval success screen: there's no status-poll endpoint
+     * (see `CustomerRegistrationRepository.reconcileApprovals`), so this reconciles against
+     * `/mobile/sales/mine` and, if the attendant's own registration was found approved, updates
+     * the on-screen status and notifies them — without having to leave this screen.
+     */
+    fun refreshRegistrationStatus() {
+        val current = _uiState.value.lastRegistration ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingRegistration = true) }
+            try {
+                customerRegistrationRepository.reconcileApprovals()
+                    .forEach { registrationApprovalNotifier.notifyApproved(it) }
+                val refreshed = customerRegistrationRepository.getById(current.localId) ?: current
+                _uiState.update { it.copy(lastRegistration = refreshed) }
+            } finally {
+                _uiState.update { it.copy(isRefreshingRegistration = false) }
+            }
         }
     }
 

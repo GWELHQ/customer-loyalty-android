@@ -9,9 +9,9 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 /**
- * Periodically rebuilds the complete local customer cache by sweeping the full national-prefix
- * space (see [CustomerRepository.refreshFullDirectory] — there's no bulk "list customers"
- * endpoint available to attendants).
+ * Periodically syncs the local customer cache against `GET /mobile/customers` (see
+ * [CustomerRepository.syncCustomers]) — a full pull the first time, an incremental
+ * `updatedSince` pull on every run after that.
  */
 @HiltWorker
 class CustomerRefreshWorker @AssistedInject constructor(
@@ -22,7 +22,7 @@ class CustomerRefreshWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            customerRepository.refreshFullDirectory()
+            customerRepository.syncCustomers()
             Result.success()
         } catch (e: Exception) {
             Result.retry()

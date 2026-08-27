@@ -21,6 +21,9 @@ interface CustomerRegistrationDao {
     @Query("SELECT * FROM customer_registrations WHERE localId = :localId")
     suspend fun getById(localId: String): CustomerRegistrationEntity?
 
+    @Query("SELECT * FROM customer_registrations WHERE localId = :localId")
+    fun observeById(localId: String): Flow<CustomerRegistrationEntity?>
+
     @Query("SELECT * FROM customer_registrations WHERE syncStatus IN ('PENDING', 'FAILED') ORDER BY capturedAtMillis ASC")
     suspend fun getPending(): List<CustomerRegistrationEntity>
 
@@ -29,6 +32,16 @@ interface CustomerRegistrationDao {
 
     @Query("SELECT * FROM customer_registrations ORDER BY capturedAtMillis DESC")
     fun observeAll(): Flow<List<CustomerRegistrationEntity>>
+
+    /**
+     * Today's still-unapproved registrations (APPROVED ones are excluded — those already became
+     * a real row in `sales` via `SaleRepository.adoptServerSale` and show up there instead).
+     */
+    @Query(
+        "SELECT * FROM customer_registrations WHERE capturedAtMillis >= :startOfDayMillis " +
+            "AND syncStatus != 'APPROVED' ORDER BY capturedAtMillis DESC"
+    )
+    fun observeTodayUnapproved(startOfDayMillis: Long): Flow<List<CustomerRegistrationEntity>>
 
     @Query("SELECT COUNT(*) FROM customer_registrations WHERE syncStatus IN ('PENDING', 'SYNCING', 'FAILED')")
     fun observePendingCount(): Flow<Int>

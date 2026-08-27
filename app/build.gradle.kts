@@ -17,6 +17,18 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+// Africa's Talking SMS credentials — never hardcoded here. Local dev reads them from
+// local.properties (gitignored); CI/production should inject the same keys as environment
+// variables instead. Builds simply send with an empty apiKey (fails fast, not a crash) if unset.
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties().apply {
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+fun smsProperty(key: String): String =
+    (localProperties.getProperty(key) ?: System.getenv(key) ?: "")
+
 android {
     namespace = "com.example.loyaltyapp"
     compileSdk {
@@ -29,13 +41,22 @@ android {
         applicationId = "com.example.loyaltyapp"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "com.example.loyaltyapp.HiltTestRunner"
 
-        // Emulator -> host-machine loopback; local dev only. Release points at the real backend below.
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/api/v1/\"")
+        // Same Cloud Run backend as release — works from the emulator and any physical device
+        // over plain internet, no dev-machine IP or same-Wi-Fi requirement. Swap to
+        // "http://10.0.2.2:8080/api/v1/" (emulator only) if you need to hit a local backend.
+        buildConfigField("String", "API_BASE_URL", "\"https://loyalty-api-220192479053.us-central1.run.app/api/v1/\"")
+
+        // Same live Africa's Talking account in every build type — this is a real production
+        // integration, not a dev-only stub (see AfricasTalkingSmsSender).
+        buildConfigField("String", "AFRICASTALKING_USERNAME", "\"${smsProperty("AFRICASTALKING_USERNAME")}\"")
+        buildConfigField("String", "AFRICASTALKING_API_KEY", "\"${smsProperty("AFRICASTALKING_API_KEY")}\"")
+        buildConfigField("String", "AFRICASTALKING_BASE_URL", "\"${smsProperty("AFRICASTALKING_BASE_URL")}\"")
+        buildConfigField("String", "AFRICASTALKING_SENDER_ID", "\"${smsProperty("AFRICASTALKING_SENDER_ID")}\"")
     }
 
     signingConfigs {
@@ -105,6 +126,13 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.work.runtime.ktx)
+
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.androidx.exifinterface)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

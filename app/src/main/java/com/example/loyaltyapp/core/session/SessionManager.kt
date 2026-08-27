@@ -37,8 +37,16 @@ class SessionManager @Inject constructor(
 
     fun currentAccessToken(): String? = _session.value?.accessToken
 
+    /**
+     * Writes synchronously (`commit`, not `apply`) so a completed login is durably on disk before
+     * this returns — if the process died between an async `apply()` and its background flush (a
+     * real risk right after a fresh install/login, when the app is most likely to be backgrounded
+     * or killed), the session would silently vanish: every screen would then see `currentSession()
+     * == null` and quietly render its empty-state defaults instead of bouncing back to login,
+     * which looks like "sales aren't syncing" rather than "you got signed out."
+     */
     fun save(dto: LoginResponseDto, capturedAtMillis: Long) {
-        prefs.edit {
+        prefs.edit(commit = true) {
             putString(KEY_ATTENDANT_ID, dto.attendant.attendantId)
             putString(KEY_EMPLOYEE_ID, dto.attendant.employeeId)
             putString(KEY_FULL_NAME, dto.attendant.fullName)
@@ -50,7 +58,7 @@ class SessionManager @Inject constructor(
     }
 
     fun clear() {
-        prefs.edit { clear() }
+        prefs.edit(commit = true) { clear() }
         _session.value = null
     }
 
@@ -62,15 +70,16 @@ class SessionManager @Inject constructor(
     }
 
     /**
-     * Where the customer-directory sweep left off (an index into its prefix list) — the sweep
-     * is rate-limit-bound (see [com.example.loyaltyapp.data.repository.CustomerRepository]) and
-     * spans multiple short worker runs rather than one long one, so it needs to resume rather
-     * than restart from zero every time.
+     * When the customer master list was last fully pulled (see
+     * [com.example.loyaltyapp.data.repository.CustomerRepository]) — null means never, so the
+     * next sync does a full pull; otherwise it's passed as `updatedSince` to fetch only what
+     * changed, cheap enough to run on every login and periodic tick.
      */
-    fun directorySweepIndex(): Int = prefs.getInt(KEY_DIRECTORY_SWEEP_INDEX, 0)
+    fun lastCustomerSyncAtMillis(): Long? =
+        prefs.getLong(KEY_LAST_CUSTOMER_SYNC, -1L).takeIf { it > 0L }
 
-    fun saveDirectorySweepIndex(index: Int) {
-        prefs.edit { putInt(KEY_DIRECTORY_SWEEP_INDEX, index) }
+    fun saveLastCustomerSyncAtMillis(millis: Long) {
+        prefs.edit { putLong(KEY_LAST_CUSTOMER_SYNC, millis) }
     }
 
     /** True once the client-known 12h TTL has elapsed — a courtesy check; the server is authoritative via 401. */
@@ -99,6 +108,6 @@ class SessionManager @Inject constructor(
         const val KEY_TOKEN = "auth_token"
         const val KEY_ISSUED_AT = "token_issued_at"
         const val KEY_CONFIG_VERSION = "config_version"
-        const val KEY_DIRECTORY_SWEEP_INDEX = "directory_sweep_index"
+        const val KEY_LAST_CUSTOMER_SYNC = "last_customer_sync_at"
     }
 }

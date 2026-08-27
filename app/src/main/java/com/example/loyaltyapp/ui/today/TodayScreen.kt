@@ -2,6 +2,7 @@ package com.example.loyaltyapp.ui.today
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.loyaltyapp.core.money.Money
+import com.example.loyaltyapp.data.local.entity.CustomerRegistrationEntity
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.data.local.entity.SaleEntity
 import com.example.loyaltyapp.ui.components.AppBottomNav
@@ -32,6 +34,7 @@ import com.example.loyaltyapp.ui.components.BottomNavDestination
 import com.example.loyaltyapp.ui.components.ConnectionState
 import com.example.loyaltyapp.ui.components.EmptyState
 import com.example.loyaltyapp.ui.components.StatusPill
+import com.example.loyaltyapp.ui.components.PillTone
 import com.example.loyaltyapp.ui.components.TabularText
 import com.example.loyaltyapp.ui.components.TopStatusBar
 import com.example.loyaltyapp.ui.components.toDisplayLabel
@@ -51,6 +54,7 @@ import java.util.Locale
 fun TodayScreen(
     onGoNewSale: () -> Unit,
     onGoProfile: () -> Unit,
+    onOpenDetail: (com.example.loyaltyapp.ui.navigation.TodayDetailType, String) -> Unit,
     viewModel: TodayViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -110,11 +114,20 @@ fun TodayScreen(
             }
             Box(modifier = Modifier.padding(top = 8.dp)) {}
 
-            if (state.sales.isEmpty()) {
+            if (state.items.isEmpty()) {
                 EmptyState("No sales yet today", "Recorded sales will show up here as soon as you record one.")
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.sales.forEach { sale -> SaleRow(sale) }
+                    state.items.forEach { item ->
+                        when (item) {
+                            is TodayListItem.SaleItem -> SaleRow(item.sale) {
+                                onOpenDetail(com.example.loyaltyapp.ui.navigation.TodayDetailType.SALE, item.sale.localSaleId)
+                            }
+                            is TodayListItem.PendingRegistrationItem -> PendingRegistrationRow(item.registration) {
+                                onOpenDetail(com.example.loyaltyapp.ui.navigation.TodayDetailType.REGISTRATION, item.registration.localId)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -149,12 +162,13 @@ private fun StatCard(label: String, value: String, note: String, modifier: Modif
 }
 
 @Composable
-private fun SaleRow(sale: SaleEntity) {
+private fun SaleRow(sale: SaleEntity, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(ColorSurface, RoundedCornerShape(12.dp))
             .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .padding(13.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -176,6 +190,34 @@ private fun SaleRow(sale: SaleEntity) {
                 Box(modifier = Modifier.weight(1f))
                 Text("See your supervisor", color = ColorTextMuted, fontSize = 11.5.sp)
             }
+        }
+    }
+}
+
+/** A new-customer request still awaiting a supervisor's decision — not a confirmed sale yet. */
+@Composable
+private fun PendingRegistrationRow(registration: CustomerRegistrationEntity, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ColorSurface, RoundedCornerShape(12.dp))
+            .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(13.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(registration.customerFullName, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                TabularText(
+                    "${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(registration.capturedAtMillis))} · ${if (registration.product == Product.PMS) "Petrol" else "Diesel"} · New customer",
+                    color = ColorTextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+            TabularText(Money.formatKes(registration.amountPaid), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = ColorText)
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            StatusPill(text = "Pending approval", tone = PillTone.WARN)
         }
     }
 }

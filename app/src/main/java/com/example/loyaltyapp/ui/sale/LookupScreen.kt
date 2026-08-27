@@ -48,7 +48,10 @@ fun LookupScreen(
     onBackspace: () -> Unit,
     onClear: () -> Unit,
     onPick: (String) -> Unit,
-    onCreate: () -> Unit
+    onCreate: () -> Unit,
+    onRetryLookup: () -> Unit,
+    onScanQr: () -> Unit,
+    onScanNfc: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -87,6 +90,55 @@ fun LookupScreen(
             }
         }
 
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SecondaryButton(text = "Scan QR code", onClick = onScanQr, modifier = Modifier.weight(1f), height = 44.dp)
+            SecondaryButton(text = "Tap NFC tag", onClick = onScanNfc, modifier = Modifier.weight(1f), height = 44.dp)
+        }
+
+        if (state.scanError != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(GwTheme.extended.warningTint, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Row {
+                    Icon(Icons.Filled.Warning, contentDescription = null, tint = GwTheme.extended.warning, modifier = Modifier.size(18.dp))
+                    Box(modifier = Modifier.width(10.dp))
+                    Text(state.scanError, color = ColorTextSecondary, fontSize = 13.sp)
+                }
+            }
+        }
+
+        if (state.lookupFailed) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(GwTheme.extended.warningTint, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Row {
+                    Icon(Icons.Filled.Warning, contentDescription = null, tint = GwTheme.extended.warning, modifier = Modifier.size(18.dp))
+                    Box(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text("Couldn't reach the office", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(
+                            "We couldn't check ${PhoneNumber.formatPartial(state.queryDigits)} against the customer list. Check your connection and try again — don't create a new account for a number we haven't confirmed.",
+                            color = ColorTextSecondary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
+                }
+                PrimaryButton(
+                    text = "Try again",
+                    onClick = onRetryLookup,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    height = 46.dp
+                )
+            }
+        }
+
         val showNotFound = state.confirmedNotFound
         if (showNotFound) {
             Column(
@@ -110,7 +162,7 @@ fun LookupScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SecondaryButton(text = "Re-enter number", onClick = onClear, modifier = Modifier.weight(1f), height = 46.dp)
-                    PrimaryButton(text = "Create customer", onClick = onCreate, modifier = Modifier.weight(1f), height = 46.dp)
+                    PrimaryButton(text = "Create", onClick = onCreate, modifier = Modifier.weight(1f), height = 46.dp)
                 }
             }
         }

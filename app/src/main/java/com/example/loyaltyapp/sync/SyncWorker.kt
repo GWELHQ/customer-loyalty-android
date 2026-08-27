@@ -12,9 +12,11 @@ import dagger.assisted.AssistedInject
 
 /**
  * Pushes locally queued sales (batched via `/mobile/sync`) and pending customer-registration
- * requests (retried individually — no bulk endpoint) to the backend, then checks whether any
+ * requests (retried individually — no bulk endpoint) to the backend, checks whether any
  * still-pending registration has since been approved by a supervisor (see
- * `CustomerRegistrationRepository.reconcileApprovals`), notifying the attendant for each one.
+ * `CustomerRegistrationRepository.reconcileApprovals`), notifying the attendant for each one, and
+ * pulls down today's sales from the server so one recorded on a different device signed into
+ * the same attendant account shows up here too (see `SaleRepository.pullTodayFromServer`).
  * Runs periodically in the background and is also triggered immediately whenever connectivity
  * returns or the attendant taps "Sync now". Safe to run concurrently or repeatedly — every
  * submission is idempotency-keyed.
@@ -34,6 +36,7 @@ class SyncWorker @AssistedInject constructor(
             customerRegistrationRepository.retryAllPending()
             customerRegistrationRepository.reconcileApprovals()
                 .forEach { registrationApprovalNotifier.notifyApproved(it) }
+            saleRepository.pullTodayFromServer()
             Result.success()
         } catch (e: Exception) {
             Result.retry()

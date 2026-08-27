@@ -80,7 +80,7 @@ fun PrimaryButton(
             disabledContentColor = ColorSurface
         )
     ) {
-        Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 
@@ -100,7 +100,7 @@ fun SecondaryButton(
         border = androidx.compose.foundation.BorderStroke(1.dp, ColorBorderStrong),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorText)
     ) {
-        Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 

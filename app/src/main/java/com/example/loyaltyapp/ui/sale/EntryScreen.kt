@@ -82,7 +82,7 @@ fun EntryScreen(
                     .fillMaxWidth()
                     .padding(top = 10.dp)
                     .border(1.dp, ColorBorder, RoundedCornerShape(0.dp))
-                    .padding(top = 10.dp),
+                    .padding(start = 10.dp, top = 12.dp, bottom = 12.dp, end = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = GwTheme.extended.success, modifier = Modifier.size(15.dp))
@@ -161,12 +161,6 @@ fun EntryScreen(
                 // Cashback is calculated and stored on the sale, but is never shown to the
                 // attendant — surfacing the formula or amount here would let an attendant and
                 // customer coordinate to game it. Only the customer learns their cashback, by SMS.
-
-                state.entryBlockReason?.let {
-                    Text(it, color = GwTheme.extended.warning, fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                }
 
                 PrimaryButton(
                     text = "Review sale",

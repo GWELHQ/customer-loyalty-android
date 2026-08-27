@@ -24,5 +24,7 @@ data class CustomerEntity(
     val specialRateEffectiveFrom: Long?,
     val specialRateEffectiveTo: Long?,
     val totalCashbackEarned: BigDecimal,
-    val updatedAtMillis: Long
+    val updatedAtMillis: Long,
+    val licensePlateNumber: String? = null,
+    val nfcTagId: String? = null
 )

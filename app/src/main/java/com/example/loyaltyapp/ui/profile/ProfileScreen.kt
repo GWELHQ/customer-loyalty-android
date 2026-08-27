@@ -51,7 +51,6 @@ fun ProfileScreen(
     onGoNewSale: () -> Unit,
     onGoToday: () -> Unit,
     onSyncQueue: () -> Unit,
-    onDailySummary: () -> Unit,
     onSignedOut: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
@@ -137,17 +136,6 @@ fun ProfileScreen(
                         Text("View sync queue")
                     }
                 }
-            }
-
-            GwCard {
-                Text("End of shift", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(
-                    "See today's reconciliation summary before you sign out.",
-                    color = ColorTextSecondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-                )
-                SecondaryButton(text = "End-of-shift summary", onClick = onDailySummary, height = 44.dp)
             }
 
             GwCard {

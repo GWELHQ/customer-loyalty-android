@@ -1,6 +1,7 @@
 package com.example.loyaltyapp.ui.sale
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -44,50 +45,83 @@ fun SaleFlowScreen(
             SyncBanner(pendingCount = state.pendingSyncCount, onSyncNow = viewModel::syncNow)
         }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            when (state.screen) {
-                SaleScreen.LOOKUP -> LookupScreen(
-                    state = state,
-                    onDigit = viewModel::onQueryDigit,
-                    onBackspace = viewModel::onQueryBackspace,
-                    onClear = viewModel::clearQuery,
-                    onPick = viewModel::pickCustomer,
-                    onCreate = viewModel::goCreate
-                )
-                SaleScreen.CREATE -> CreateCustomerScreen(
-                    state = state,
-                    onBack = viewModel::goLookup,
-                    onNameChange = viewModel::onNewCustomerNameChange,
-                    onContinue = viewModel::continueToRegistrationDetails
-                )
-                SaleScreen.BLOCKED -> BlockedScreen(
-                    monthLabel = "this month",
-                    onRetry = viewModel::retryPrice
-                )
-                SaleScreen.ENTRY -> EntryScreen(
-                    state = state,
-                    onChangeCustomer = viewModel::goLookup,
-                    onPickProduct = viewModel::pickProduct,
-                    onAmountDigit = viewModel::onAmountDigit,
-                    onAmountBackspace = viewModel::onAmountBackspace,
-                    onClearAmount = viewModel::clearAmount,
-                    onReview = viewModel::goReview
-                )
-                SaleScreen.REVIEW -> ReviewScreen(
-                    state = state,
-                    onEdit = viewModel::goEntry,
-                    onSubmit = viewModel::submitSale
-                )
-                SaleScreen.SUCCESS -> SuccessScreen(
+        // The pending-approval success screen owns a PullToRefreshBox, which needs a
+        // bounded-height container — it can't sit inside the shared verticalScroll Column below
+        // (unbounded height there breaks pull-to-refresh's own scrolling), so it gets its own
+        // fixed-height Box instead.
+        if (state.screen == SaleScreen.SUCCESS && state.lastRegistration != null) {
+            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                SuccessScreen(
                     state = state,
                     onRecordAnother = viewModel::recordAnother,
-                    onGoToday = onGoToday
+                    onGoToday = onGoToday,
+                    onRefreshRegistration = viewModel::refreshRegistrationStatus
                 )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                when (state.screen) {
+                    SaleScreen.LOOKUP -> LookupScreen(
+                        state = state,
+                        onDigit = viewModel::onQueryDigit,
+                        onBackspace = viewModel::onQueryBackspace,
+                        onClear = viewModel::clearQuery,
+                        onPick = viewModel::pickCustomer,
+                        onCreate = viewModel::goCreate,
+                        onRetryLookup = viewModel::retryLookup,
+                        onScanQr = viewModel::goQrScan,
+                        onScanNfc = viewModel::goNfcScan
+                    )
+                    SaleScreen.QR_SCAN -> QrScanScreen(
+                        onCodeScanned = viewModel::onQrCodeScanned,
+                        onCancel = viewModel::goLookup
+                    )
+                    SaleScreen.NFC_SCAN -> NfcScanScreen(
+                        onTagRead = viewModel::onNfcTagRead,
+                        onCancel = viewModel::goLookup
+                    )
+                    SaleScreen.PLATE_CHECK -> PlateCheckScreen(
+                        state = state,
+                        onCapture = viewModel::submitPlateCheck,
+                        onSkip = viewModel::skipPlateCheck,
+                        onRetry = viewModel::retryPlateCheck,
+                        onContinue = viewModel::continueAfterPlateCheck
+                    )
+                    SaleScreen.CREATE -> CreateCustomerScreen(
+                        state = state,
+                        onBack = viewModel::goLookup,
+                        onNameChange = viewModel::onNewCustomerNameChange,
+                        onContinue = viewModel::continueToRegistrationDetails
+                    )
+                    SaleScreen.BLOCKED -> BlockedScreen(
+                        monthLabel = "this month",
+                        onRetry = viewModel::retryPrice
+                    )
+                    SaleScreen.ENTRY -> EntryScreen(
+                        state = state,
+                        onChangeCustomer = viewModel::goLookup,
+                        onPickProduct = viewModel::pickProduct,
+                        onAmountDigit = viewModel::onAmountDigit,
+                        onAmountBackspace = viewModel::onAmountBackspace,
+                        onClearAmount = viewModel::clearAmount,
+                        onReview = viewModel::goReview
+                    )
+                    SaleScreen.REVIEW -> ReviewScreen(
+                        state = state,
+                        onEdit = viewModel::goEntry,
+                        onSubmit = viewModel::submitSale
+                    )
+                    SaleScreen.SUCCESS -> SuccessScreen(
+                        state = state,
+                        onRecordAnother = viewModel::recordAnother,
+                        onGoToday = onGoToday
+                    )
+                }
             }
         }
 

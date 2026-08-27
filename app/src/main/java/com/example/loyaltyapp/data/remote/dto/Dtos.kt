@@ -79,7 +79,18 @@ data class CustomerDto(
     val totalCashbackEarned: Double = 0.0,
     val source: String? = null,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
+    // Absent means "not set," not an error — plate/NFC lookup are optional per-customer extras
+    // added by staff from the web admin, with no in-app registration flow for either.
+    val licensePlateNumber: String? = null,
+    val nfcTagId: String? = null
+)
+
+/** Response for `GET /mobile/customers` — full/incremental customer sync, paginated. */
+@Serializable
+data class CustomerListResponseDto(
+    val items: List<CustomerDto>,
+    val nextCursor: String? = null
 )
 
 // ---- Sales -----------------------------------------------------------
@@ -94,7 +105,11 @@ data class SaleRequestDto(
     val idempotencyKey: String,
     val clientLocalId: String? = null,
     val claimedPricePerLitre: Double? = null,
-    val claimedCashbackEarned: Double? = null
+    val claimedCashbackEarned: Double? = null,
+    // Optional: only present when a vehicle-plate photo was captured for this sale (see
+    // VehiclePlateCheckDto). The backend re-validates it server-side (same customer, <60min old)
+    // and silently ignores it otherwise — never an error, so this is safe to omit or get stale.
+    val plateCheckId: String? = null
 )
 
 @Serializable
@@ -125,6 +140,36 @@ data class SaleResponseDto(
     val source: String? = null,
     val smsStatus: String,
     val createdAt: String? = null,
+    val updatedAt: String? = null,
+    // Present on the immediate `/mobile/sales` create response — the backend no longer sends the
+    // SMS itself for app-created sales, so this app sends it directly using this figure (see
+    // AfricasTalkingSmsSender). Null on responses that don't carry it (e.g. `/mobile/sales/mine`).
+    val monthToDateCashback: Double? = null,
+    // Present only if a valid plateCheckId was carried through on the request (see
+    // SaleRequestDto.plateCheckId) — absent otherwise, same "absent means not set" rule as above.
+    val licensePlateCheck: LicensePlateCheckSummaryDto? = null
+)
+
+@Serializable
+data class LicensePlateCheckSummaryDto(
+    val plateCheckId: String,
+    val detectedPlateNumber: String? = null,
+    val matched: Boolean
+)
+
+// ---- Vehicle-plate photo verification -------------------------------------
+
+@Serializable
+data class VehiclePlateCheckDto(
+    val id: String,
+    val customerId: String,
+    val customerNameAtCheck: String? = null,
+    val attendantId: String? = null,
+    val stationId: String? = null,
+    val imageUrl: String? = null,
+    val detectedPlateNumber: String? = null,
+    val matched: Boolean,
+    val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
@@ -141,12 +186,27 @@ data class SyncResultDto(
     val idempotencyKey: String,
     val result: String, // accepted | needs_review | already_processed | rejected
     val saleId: String? = null,
-    val errorReason: String? = null
+    val errorReason: String? = null,
+    // Present only when result is "accepted" or "needs_review" — a sale was actually created (or
+    // re-affirmed) by this batch and the app should send the confirmation SMS itself. Absent for
+    // "already_processed"/"rejected": either already handled or no sale exists to text about.
+    val customerPhone: String? = null,
+    val cashbackEarned: Double? = null,
+    val monthToDateCashback: Double? = null
 )
 
 @Serializable
 data class SyncResponseDto(
     val results: List<SyncResultDto>
+)
+
+// ---- SMS delivery report (app -> API, fire-and-forget) --------------------
+
+@Serializable
+data class SmsStatusReportDto(
+    val success: Boolean,
+    val providerResponse: String? = null,
+    val errorReason: String? = null
 )
 
 @Serializable

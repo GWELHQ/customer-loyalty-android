@@ -47,5 +47,10 @@ data class SaleEntity(
     val syncAttempts: Int = 0,
     val lastSyncErrorMessage: String? = null,
 
-    val smsStatus: SmsStatus
+    val smsStatus: SmsStatus,
+
+    // Carried through to the sale request so a queued/retried sale still submits the plate check
+    // it was captured with. Optional — null when no photo was taken. The backend re-validates it
+    // (same customer, <60min old) and silently ignores it if stale by the time this syncs.
+    val plateCheckId: String? = null
 )
