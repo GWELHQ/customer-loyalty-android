@@ -100,15 +100,15 @@ fun LoginScreen(
             // toggle, not a wizard step; switching modes never loses what's typed in the other.
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LoginModeTab(
-                    text = "ID + PIN",
-                    selected = state.loginMode == LoginMode.PIN,
-                    onClick = { viewModel.setLoginMode(LoginMode.PIN) },
-                    modifier = Modifier.weight(1f)
-                )
-                LoginModeTab(
                     text = "Tap badge",
                     selected = state.loginMode == LoginMode.BADGE,
                     onClick = { viewModel.setLoginMode(LoginMode.BADGE) },
+                    modifier = Modifier.weight(1f)
+                )
+                LoginModeTab(
+                    text = "ID + PIN",
+                    selected = state.loginMode == LoginMode.PIN,
+                    onClick = { viewModel.setLoginMode(LoginMode.PIN) },
                     modifier = Modifier.weight(1f)
                 )
             }

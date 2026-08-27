@@ -25,7 +25,7 @@ data class LoginUiState(
     val error: String? = null,
     val restoredSession: AttendantSession? = null,
     val isRestoring: Boolean = true,
-    val loginMode: LoginMode = LoginMode.PIN
+    val loginMode: LoginMode = LoginMode.BADGE
 )
 
 @HiltViewModel
