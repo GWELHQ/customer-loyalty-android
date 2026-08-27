@@ -55,11 +55,12 @@ import java.io.File
 
 /**
  * Vehicle-plate photo verification (handover doc §3) — shown after a customer is selected and
- * before amount entry. Deliberately never a gate: "Skip" is always available, and a captured
- * photo's result (matched/mismatch/undetected) is shown for attendant awareness, with a "Retake"
- * option (testing/QA aid — lets staff re-shoot a photo the OCR clearly misread rather than
- * living with it) — neither ever blocks the sale, per "never block or require a retry on a
- * mismatch or a failed detection."
+ * before amount entry. A captured photo's result (matched/mismatch/undetected) is shown for
+ * attendant awareness, with a "Retake" option (testing/QA aid — lets staff re-shoot a photo the
+ * OCR clearly misread rather than living with it); neither a mismatch nor a failed detection
+ * ever blocks the sale once a photo has been submitted. Capturing a photo itself is currently
+ * mandatory — [onSkip] is wired through from [SaleFlowViewModel.skipPlateCheck] but not offered
+ * in this screen's UI.
  */
 @Composable
 fun PlateCheckScreen(
@@ -91,11 +92,6 @@ fun PlateCheckScreen(
     ) {
         Column {
             Text("Vehicle plate photo", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-//            Text(
-//                "Optional — photograph the vehicle's number plate for audit. This never blocks the sale.",
-//                color = ColorTextSecondary,
-//                fontSize = 13.sp
-//            )
         }
 
         val result = state.plateCheck
@@ -192,17 +188,13 @@ fun PlateCheckScreen(
             else -> GwCard {
                 Text("Camera permission needed", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(
-                    "Grant camera access to take a plate photo, or skip this step.",
+                    "Grant camera access to take a plate photo.",
                     color = ColorTextSecondary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
-
-//        if (result == null && !state.isSubmittingPlateCheck && !state.plateCheckFailed) {
-//            SecondaryButton(text = "Skip", onClick = onSkip)
-//        }
     }
 }
 
