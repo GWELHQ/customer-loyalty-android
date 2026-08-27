@@ -36,6 +36,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.loyaltyapp.core.scan.QrCodeAnalyzer
 import com.example.loyaltyapp.ui.components.GwCard
+import com.example.loyaltyapp.ui.components.ScanResultOverlay
+import com.example.loyaltyapp.ui.components.ScanResultUi
 import com.example.loyaltyapp.ui.components.SecondaryButton
 import com.example.loyaltyapp.ui.theme.ColorText
 import com.example.loyaltyapp.ui.theme.ColorTextSecondary
@@ -47,6 +49,7 @@ import com.example.loyaltyapp.ui.theme.ColorTextSecondary
  */
 @Composable
 fun QrScanScreen(
+    scanResult: ScanResultUi?,
     onCodeScanned: (String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -77,7 +80,14 @@ fun QrScanScreen(
             )
         }
 
-        if (hasCameraPermission) {
+        if (scanResult != null) {
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                ScanResultOverlay(scanResult)
+            }
+        } else if (hasCameraPermission) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

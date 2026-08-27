@@ -60,7 +60,7 @@ fun LookupScreen(
         Column {
             Text("New sale", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Text(
-                "Step 1 of 3 · Find the customer by phone number",
+                "Step 1 of 4 · Find customer by number, QR or NFC tag",
                 color = ColorTextSecondary,
                 fontSize = 13.sp
             )

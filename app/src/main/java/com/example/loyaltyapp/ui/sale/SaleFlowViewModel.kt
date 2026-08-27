@@ -16,8 +16,10 @@ import com.example.loyaltyapp.data.repository.SaleRepository
 import com.example.loyaltyapp.data.repository.StationRepository
 import com.example.loyaltyapp.data.repository.VehiclePlateCheckRepository
 import com.example.loyaltyapp.sync.SyncScheduler
+import com.example.loyaltyapp.ui.components.ScanResultUi
 import java.io.File
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +31,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** How long the check/X [ScanResultUi] banner stays up before the flow moves on — long enough to register as a deliberate result, short enough not to feel like a wait. */
+private const val SCAN_RESULT_DISPLAY_MILLIS = 1100L
 
 @HiltViewModel
 class SaleFlowViewModel @Inject constructor(
@@ -199,11 +204,11 @@ class SaleFlowViewModel @Inject constructor(
     }
 
     fun goQrScan() {
-        _uiState.update { it.copy(screen = SaleScreen.QR_SCAN, scanError = null) }
+        _uiState.update { it.copy(screen = SaleScreen.QR_SCAN, scanError = null, scanResult = null) }
     }
 
     fun goNfcScan() {
-        _uiState.update { it.copy(screen = SaleScreen.NFC_SCAN, scanError = null) }
+        _uiState.update { it.copy(screen = SaleScreen.NFC_SCAN, scanError = null, scanResult = null) }
     }
 
     /**
@@ -214,26 +219,43 @@ class SaleFlowViewModel @Inject constructor(
      * bare-id format (no slashes), so no format detection is needed (handover doc §4).
      */
     fun onQrCodeScanned(scannedText: String) {
+        // The camera analyzer keeps delivering decoded frames while the result banner is showing
+        // (and holding the tag/pointing the camera doesn't stop) — ignore reads until this one has
+        // finished being shown, or the same tag/code fires a second overlapping lookup.
+        if (_uiState.value.scanResult != null) return
         val scannedId = scannedText.substringAfterLast('/')
         viewModelScope.launch {
             val customer = customerRepository.findById(scannedId)
             if (customer != null) {
-                selectCustomer(customer)
+                showScanResultThenSelectCustomer(customer)
             } else {
-                _uiState.update { it.copy(screen = SaleScreen.LOOKUP, scanError = "That QR code didn't match a customer. Try again or use the phone number.") }
+                showScanResultThenReturnToLookup("That QR code didn't match a customer. Try again or use the phone number.")
             }
         }
     }
 
     fun onNfcTagRead(tagId: String) {
+        if (_uiState.value.scanResult != null) return
         viewModelScope.launch {
             val customer = customerRepository.findByNfcTag(tagId)
             if (customer != null) {
-                selectCustomer(customer)
+                showScanResultThenSelectCustomer(customer)
             } else {
-                _uiState.update { it.copy(screen = SaleScreen.LOOKUP, scanError = "That tag isn't assigned to a customer. Try again or use the phone number.") }
+                showScanResultThenReturnToLookup("That tag isn't assigned to a customer. Try again or use the phone number.")
             }
         }
+    }
+
+    private suspend fun showScanResultThenSelectCustomer(customer: com.example.loyaltyapp.data.local.entity.CustomerEntity) {
+        _uiState.update { it.copy(scanResult = ScanResultUi(success = true, message = "Customer ${customer.fullName} found")) }
+        delay(SCAN_RESULT_DISPLAY_MILLIS)
+        selectCustomer(customer)
+    }
+
+    private suspend fun showScanResultThenReturnToLookup(scanError: String) {
+        _uiState.update { it.copy(scanResult = ScanResultUi(success = false, message = scanError)) }
+        delay(SCAN_RESULT_DISPLAY_MILLIS)
+        _uiState.update { it.copy(screen = SaleScreen.LOOKUP, scanError = scanError, scanResult = null) }
     }
 
     private fun selectCustomer(customer: com.example.loyaltyapp.data.local.entity.CustomerEntity) {
@@ -245,7 +267,8 @@ class SaleFlowViewModel @Inject constructor(
                 plateCheck = null,
                 plateCheckFailed = false,
                 product = null,
-                amountDigits = ""
+                amountDigits = "",
+                scanResult = null
             )
         }
     }
@@ -314,7 +337,7 @@ class SaleFlowViewModel @Inject constructor(
     }
 
     fun goLookup() {
-        _uiState.update { it.copy(screen = SaleScreen.LOOKUP, plateCheck = null, plateCheckFailed = false, scanError = null) }
+        _uiState.update { it.copy(screen = SaleScreen.LOOKUP, plateCheck = null, plateCheckFailed = false, scanError = null, scanResult = null) }
     }
 
     // --- Product + amount -----------------------------------------------

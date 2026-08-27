@@ -7,7 +7,9 @@ import com.example.loyaltyapp.core.session.AttendantSession
 import com.example.loyaltyapp.data.repository.AuthRepository
 import com.example.loyaltyapp.data.repository.BootstrapRepository
 import com.example.loyaltyapp.sync.SyncScheduler
+import com.example.loyaltyapp.ui.components.ScanResultUi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,8 +27,13 @@ data class LoginUiState(
     val error: String? = null,
     val restoredSession: AttendantSession? = null,
     val isRestoring: Boolean = true,
-    val loginMode: LoginMode = LoginMode.BADGE
+    val loginMode: LoginMode = LoginMode.BADGE,
+    /** Brief check/X feedback shown right after a badge tap resolves, before navigating away. */
+    val scanResult: ScanResultUi? = null
 )
+
+/** How long the check/X [ScanResultUi] banner stays up before the flow moves on — matches [com.example.loyaltyapp.ui.sale.SaleFlowViewModel]'s scan-result banner. */
+private const val SCAN_RESULT_DISPLAY_MILLIS = 1100L
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -94,16 +101,24 @@ class LoginViewModel @Inject constructor(
      * NFC reader keeps delivering tag reads for as long as it's held there.
      */
     fun loginWithBadge(tagId: String) {
-        if (_uiState.value.isLoading) return
+        if (_uiState.value.isLoading || _uiState.value.scanResult != null) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = authRepository.loginWithNfcTag(tagId)) {
                 is AppResult.Success -> {
                     afterSuccessfulLogin()
-                    _uiState.update { it.copy(isLoading = false, restoredSession = result.data) }
+                    _uiState.update {
+                        it.copy(isLoading = false, scanResult = ScanResultUi(success = true, message = "Attendant ${result.data.fullName} authenticated"))
+                    }
+                    delay(SCAN_RESULT_DISPLAY_MILLIS)
+                    // restoredSession is what actually triggers navigation (see LoginScreen's
+                    // LaunchedEffect) — held back until the check banner above has had its moment.
+                    _uiState.update { it.copy(scanResult = null, restoredSession = result.data) }
                 }
-                is AppResult.Failure -> _uiState.update {
-                    it.copy(isLoading = false, error = result.message)
+                is AppResult.Failure -> {
+                    _uiState.update { it.copy(isLoading = false, scanResult = ScanResultUi(success = false, message = "Badge not recognized")) }
+                    delay(SCAN_RESULT_DISPLAY_MILLIS)
+                    _uiState.update { it.copy(scanResult = null, error = result.message) }
                 }
             }
         }

@@ -92,6 +92,11 @@ fun PlateCheckScreen(
     ) {
         Column {
             Text("Vehicle plate photo", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+            Text(
+                "Step 2 of 4 · Take vehicle plate photo",
+                color = ColorTextSecondary,
+                fontSize = 13.sp
+            )
         }
 
         val result = state.plateCheck

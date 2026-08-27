@@ -153,7 +153,7 @@ fun ProfileScreen(
                     HelpLine("A sale still says Needs review after you tap Sync now.")
                     HelpLine("The app says the price for this month is missing.")
                     HelpLine("A customer says they did not get their SMS.")
-                    Text("Supervisor on duty: Beatrice Ochieng · +254 733 118 400", color = ColorTextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+//                    Text("Supervisor on duty: Beatrice Ochieng · +254 733 118 400", color = ColorTextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             }
 

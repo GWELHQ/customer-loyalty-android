@@ -78,10 +78,12 @@ fun SaleFlowScreen(
                         onScanNfc = viewModel::goNfcScan
                     )
                     SaleScreen.QR_SCAN -> QrScanScreen(
+                        scanResult = state.scanResult,
                         onCodeScanned = viewModel::onQrCodeScanned,
                         onCancel = viewModel::goLookup
                     )
                     SaleScreen.NFC_SCAN -> NfcScanScreen(
+                        scanResult = state.scanResult,
                         onTagRead = viewModel::onNfcTagRead,
                         onCancel = viewModel::goLookup
                     )

@@ -44,6 +44,8 @@ import com.example.loyaltyapp.core.session.AttendantSession
 import com.example.loyaltyapp.ui.components.GwCard
 import com.example.loyaltyapp.ui.components.LoadingState
 import com.example.loyaltyapp.ui.components.PrimaryButton
+import com.example.loyaltyapp.ui.components.ScanResultOverlay
+import com.example.loyaltyapp.ui.components.ScanResultUi
 import com.example.loyaltyapp.ui.components.SecondaryButton
 import com.example.loyaltyapp.ui.theme.ColorBg
 import com.example.loyaltyapp.ui.theme.ColorPrimary
@@ -150,6 +152,7 @@ fun LoginScreen(
             } else {
                 BadgeLoginFields(
                     isLoading = state.isLoading,
+                    scanResult = state.scanResult,
                     onTagRead = viewModel::loginWithBadge
                 )
 
@@ -177,7 +180,7 @@ private fun LoginModeTab(text: String, selected: Boolean, onClick: () -> Unit, m
  * one is already in flight (the reader keeps delivering reads for as long as the badge is held).
  */
 @Composable
-private fun BadgeLoginFields(isLoading: Boolean, onTagRead: (String) -> Unit) {
+private fun BadgeLoginFields(isLoading: Boolean, scanResult: ScanResultUi?, onTagRead: (String) -> Unit) {
     val context = LocalContext.current
     val activity = remember { context.findActivity() }
     val reader = remember(activity) { activity?.let(::NfcTagReader) }
@@ -189,7 +192,14 @@ private fun BadgeLoginFields(isLoading: Boolean, onTagRead: (String) -> Unit) {
         onDispose { reader?.stop() }
     }
 
-    if (reader?.isAvailable == true) {
+    if (scanResult != null) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
+        ) {
+            ScanResultOverlay(scanResult)
+        }
+    } else if (reader?.isAvailable == true) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)

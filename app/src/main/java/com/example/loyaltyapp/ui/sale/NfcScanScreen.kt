@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.example.loyaltyapp.core.nfc.NfcTagReader
 import com.example.loyaltyapp.core.nfc.findActivity
 import com.example.loyaltyapp.ui.components.GwCard
+import com.example.loyaltyapp.ui.components.ScanResultOverlay
+import com.example.loyaltyapp.ui.components.ScanResultUi
 import com.example.loyaltyapp.ui.components.SecondaryButton
 import com.example.loyaltyapp.ui.theme.ColorTextSecondary
 import com.example.loyaltyapp.ui.theme.GwGreen50
@@ -38,6 +40,7 @@ import com.example.loyaltyapp.ui.theme.GwGreen700
  */
 @Composable
 fun NfcScanScreen(
+    scanResult: ScanResultUi?,
     onTagRead: (String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -65,7 +68,11 @@ fun NfcScanScreen(
             )
         }
 
-        if (reader?.isAvailable == true) {
+        if (scanResult != null) {
+            Box(modifier = Modifier.fillMaxWidth().aspectRatio(1.4f), contentAlignment = Alignment.Center) {
+                ScanResultOverlay(scanResult)
+            }
+        } else if (reader?.isAvailable == true) {
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(1.4f),
                 contentAlignment = Alignment.Center

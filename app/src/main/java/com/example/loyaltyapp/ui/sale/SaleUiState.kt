@@ -6,6 +6,7 @@ import com.example.loyaltyapp.data.local.entity.PriceEntity
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.data.local.entity.SaleEntity
 import com.example.loyaltyapp.data.repository.VehiclePlateCheckResult
+import com.example.loyaltyapp.ui.components.ScanResultUi
 
 enum class SaleScreen { LOOKUP, QR_SCAN, NFC_SCAN, CREATE, BLOCKED, PLATE_CHECK, ENTRY, REVIEW, SUCCESS }
 
@@ -28,6 +29,8 @@ data class SaleUiState(
     val lookupFailed: Boolean = false,
     /** Set when a QR/NFC scan didn't resolve to a customer (not found, or the office couldn't be reached) — shown back on LOOKUP. */
     val scanError: String? = null,
+    /** Brief check/X feedback shown on the scan screen itself right after a tap/scan resolves, before moving on. */
+    val scanResult: ScanResultUi? = null,
 
     val plateCheck: VehiclePlateCheckResult? = null,
     val isSubmittingPlateCheck: Boolean = false,

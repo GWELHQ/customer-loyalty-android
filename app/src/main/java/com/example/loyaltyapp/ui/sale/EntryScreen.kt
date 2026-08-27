@@ -101,7 +101,7 @@ fun EntryScreen(
 
         Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("STEP 2 · PRODUCT", color = ColorTextMuted, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.6.sp)
+                Text("STEP 3 · PRODUCT", color = ColorTextMuted, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.6.sp)
             }
             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ProductCard(
@@ -123,7 +123,7 @@ fun EntryScreen(
 
         if (state.product != null) {
             GwCard {
-                Text("STEP 3 · AMOUNT PAID", color = ColorTextMuted, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, letterSpacing = 0.6.sp)
+                Text("STEP 4 · AMOUNT PAID", color = ColorTextMuted, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, letterSpacing = 0.6.sp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
