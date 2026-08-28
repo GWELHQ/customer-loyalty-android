@@ -2,6 +2,7 @@ package com.example.loyaltyapp.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.loyaltyapp.common.FeatureFlags
 import com.example.loyaltyapp.core.result.AppResult
 import com.example.loyaltyapp.core.session.AttendantSession
 import com.example.loyaltyapp.data.repository.AuthRepository
@@ -27,7 +28,9 @@ data class LoginUiState(
     val error: String? = null,
     val restoredSession: AttendantSession? = null,
     val isRestoring: Boolean = true,
-    val loginMode: LoginMode = LoginMode.BADGE,
+    // Badge login is disabled server-side for now (see FeatureFlags) — PIN is the only working
+    // login path until POST /auth/attendant/nfc-login is re-enabled.
+    val loginMode: LoginMode = if (FeatureFlags.BADGE_LOGIN_ENABLED) LoginMode.BADGE else LoginMode.PIN,
     /** Brief check/X feedback shown right after a badge tap resolves, before navigating away. */
     val scanResult: ScanResultUi? = null
 )

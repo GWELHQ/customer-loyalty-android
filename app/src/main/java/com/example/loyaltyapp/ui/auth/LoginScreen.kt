@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.loyaltyapp.R
+import com.example.loyaltyapp.common.FeatureFlags
 import com.example.loyaltyapp.core.nfc.NfcTagReader
 import com.example.loyaltyapp.core.nfc.findActivity
 import com.example.loyaltyapp.core.session.AttendantSession
@@ -100,23 +101,27 @@ fun LoginScreen(
         GwCard {
             // Two independent ways to obtain a session (handover doc §3.1/§3.1b) — a plain mode
             // toggle, not a wizard step; switching modes never loses what's typed in the other.
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LoginModeTab(
-                    text = "Tap badge",
-                    selected = state.loginMode == LoginMode.BADGE,
-                    onClick = { viewModel.setLoginMode(LoginMode.BADGE) },
-                    modifier = Modifier.weight(1f)
-                )
-                LoginModeTab(
-                    text = "ID + PIN",
-                    selected = state.loginMode == LoginMode.PIN,
-                    onClick = { viewModel.setLoginMode(LoginMode.PIN) },
-                    modifier = Modifier.weight(1f)
-                )
+            // Badge login is disabled server-side for now (see FeatureFlags), so the toggle itself
+            // is hidden rather than offering a mode that will just fail — PIN is the only path.
+            if (FeatureFlags.BADGE_LOGIN_ENABLED) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LoginModeTab(
+                        text = "Tap badge",
+                        selected = state.loginMode == LoginMode.BADGE,
+                        onClick = { viewModel.setLoginMode(LoginMode.BADGE) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    LoginModeTab(
+                        text = "ID + PIN",
+                        selected = state.loginMode == LoginMode.PIN,
+                        onClick = { viewModel.setLoginMode(LoginMode.PIN) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Box(modifier = Modifier.padding(top = 16.dp)) {}
             }
-            Box(modifier = Modifier.padding(top = 16.dp)) {}
 
-            if (state.loginMode == LoginMode.PIN) {
+            if (!FeatureFlags.BADGE_LOGIN_ENABLED || state.loginMode == LoginMode.PIN) {
                 Text("Employee ID", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 OutlinedTextField(
                     value = state.employeeId,

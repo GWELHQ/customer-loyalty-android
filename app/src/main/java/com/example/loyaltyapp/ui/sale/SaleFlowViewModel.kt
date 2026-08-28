@@ -2,6 +2,7 @@ package com.example.loyaltyapp.ui.sale
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.loyaltyapp.common.FeatureFlags
 import com.example.loyaltyapp.core.connectivity.ConnectivityObserver
 import com.example.loyaltyapp.core.notify.RegistrationApprovalNotifier
 import com.example.loyaltyapp.core.phone.PhoneNumber
@@ -263,7 +264,11 @@ class SaleFlowViewModel @Inject constructor(
             it.copy(
                 customer = customer,
                 isNewCustomerRegistration = false,
-                screen = SaleScreen.PLATE_CHECK,
+                // Plate-check OCR is disabled server-side (see FeatureFlags) — skip straight to
+                // ENTRY rather than a step that would only 400 against
+                // POST /mobile/vehicle-plate-checks. plateCheck stays null, so no plateCheckId
+                // is ever attached to the sale.
+                screen = if (FeatureFlags.PLATE_CHECK_ENABLED) SaleScreen.PLATE_CHECK else SaleScreen.ENTRY,
                 plateCheck = null,
                 plateCheckFailed = false,
                 product = null,

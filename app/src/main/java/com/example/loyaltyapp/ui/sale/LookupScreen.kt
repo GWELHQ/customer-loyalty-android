@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.loyaltyapp.common.FeatureFlags
 import com.example.loyaltyapp.core.phone.PhoneNumber
 import com.example.loyaltyapp.data.local.entity.CustomerEntity
 import com.example.loyaltyapp.ui.components.GwCard
@@ -60,7 +61,11 @@ fun LookupScreen(
         Column {
             Text("New sale", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Text(
-                "Step 1 of 4 · Find customer by number, QR or NFC tag",
+                run {
+                    val totalSteps = if (FeatureFlags.PLATE_CHECK_ENABLED) 4 else 3
+                    val findBy = if (FeatureFlags.CUSTOMER_NFC_SCAN_ENABLED) "number, QR or NFC tag" else "number or QR"
+                    "Step 1 of $totalSteps · Find customer by $findBy"
+                },
                 color = ColorTextSecondary,
                 fontSize = 13.sp
             )
@@ -92,7 +97,11 @@ fun LookupScreen(
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SecondaryButton(text = "Scan QR code", onClick = onScanQr, modifier = Modifier.weight(1f), height = 44.dp)
-            SecondaryButton(text = "Tap NFC tag", onClick = onScanNfc, modifier = Modifier.weight(1f), height = 44.dp)
+            // NFC customer scan-to-select is disabled server-side (see FeatureFlags) — button
+            // hidden rather than left to fail against a 400 from GET /mobile/customers/nfc/:tagId.
+            if (FeatureFlags.CUSTOMER_NFC_SCAN_ENABLED) {
+                SecondaryButton(text = "Tap NFC tag", onClick = onScanNfc, modifier = Modifier.weight(1f), height = 44.dp)
+            }
         }
 
         if (state.scanError != null) {
