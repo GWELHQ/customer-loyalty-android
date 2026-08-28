@@ -92,24 +92,28 @@ class CustomerRepository @Inject constructor(
     suspend fun findByPhone(phoneNumber: String): CustomerEntity? = customerDao.findByPhone(phoneNumber)
 
     /**
-     * Resolves a scanned QR code (the code is simply the customer's own id) — cache-first, then
-     * an authoritative remote lookup so a code minted after this device's last sync still works.
-     * Null means "not found or couldn't reach the office"; callers can't distinguish the two,
-     * matching how a QR code that doesn't resolve should be handled either way (ask to retry / use
-     * phone lookup instead — there's nothing to "confirm not found" here the way phone search has).
+     * Resolves a scanned QR code (the code is simply the customer's own id) — network-first when
+     * online so an admin-side edit (e.g. a renamed customer) is never shown stale just because
+     * this device already had that customer cached; falls back to the local cache when offline or
+     * when the request fails, and to a fresh remote lookup so a code minted after this device's
+     * last sync still works. Null means "not found or couldn't reach the office"; callers can't
+     * distinguish the two, matching how a QR code that doesn't resolve should be handled either way
+     * (ask to retry / use phone lookup instead — there's nothing to "confirm not found" here the
+     * way phone search has).
      */
     suspend fun findById(customerId: String): CustomerEntity? {
-        customerDao.getById(customerId)?.let { return it }
-        if (!connectivityObserver.currentlyOnline()) return null
-        return try {
-            val remote = mobileApi.getCustomerById(customerId)
-            val entity = remote.toEntity()
-            customerDao.upsert(entity)
-            entity
-        } catch (e: Exception) {
-            android.util.Log.w("CustomerRepository", "findById($customerId) failed: ${e::class.simpleName} ${e.message}", e)
-            null
+        if (connectivityObserver.currentlyOnline()) {
+            try {
+                val remote = mobileApi.getCustomerById(customerId)
+                val entity = remote.toEntity()
+                customerDao.upsert(entity)
+                return entity
+            } catch (e: Exception) {
+                android.util.Log.w("CustomerRepository", "findById($customerId) failed: ${e::class.simpleName} ${e.message}", e)
+                // fall through to the local cache below
+            }
         }
+        return customerDao.getById(customerId)
     }
 
     /** Resolves a tapped NFC tag's UID to a customer. Always a live lookup — tags are assigned from the web admin, so there's nothing useful to cache locally by tag id. */
