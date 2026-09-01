@@ -45,4 +45,13 @@ interface CustomerRegistrationDao {
 
     @Query("SELECT COUNT(*) FROM customer_registrations WHERE syncStatus IN ('PENDING', 'SYNCING', 'FAILED')")
     fun observePendingCount(): Flow<Int>
+
+    /**
+     * Used by AttendantCredentialGarbageCollector to decide whether an attendant's retained
+     * refresh token is still needed — broader than just PENDING/FAILED, since a SUBMITTED
+     * registration still needs that attendant's token later for `reconcileApprovals()` to poll
+     * `/mobile/sales/mine` and detect a supervisor's approval. Only APPROVED is truly done.
+     */
+    @Query("SELECT COUNT(*) FROM customer_registrations WHERE attendantId = :attendantId AND syncStatus != 'APPROVED'")
+    suspend fun countUnresolvedForAttendant(attendantId: String): Int
 }

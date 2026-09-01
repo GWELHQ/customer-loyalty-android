@@ -18,11 +18,24 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import retrofit2.Retrofit
 import javax.inject.Singleton
 
+/** Login/nfc-login/refresh don't carry the current session's token, and a 401 on them never clears it. */
+private val UNAUTHENTICATED_PATHS = setOf(
+    "auth/attendant/login",
+    "auth/attendant/nfc-login",
+    "auth/attendant/refresh"
+)
+
 /**
  * Backend endpoints are configured here: base URL comes from [BuildConfig.API_BASE_URL]
  * (`app/build.gradle.kts`). Every mobile route requires `Authorization: Bearer <token>` except
- * login; a 401 anywhere means the token is invalid/expired/deactivated and there's no refresh —
+ * login/nfc-login/refresh; a 401 anywhere else means the token is invalid/expired/deactivated —
  * clearing the session here sends the app back to the PIN login screen.
+ *
+ * A request that already carries an explicit `Authorization` header (e.g. `MobileApi.syncAs`,
+ * used by [com.example.loyaltyapp.core.session.AttendantSyncAuthenticator] to sync a *different*,
+ * logged-out attendant's queue in the background) is left untouched here — never overwritten with
+ * the current foreground session's token, and never allowed to clear the foreground session on a
+ * 401 that actually belongs to someone else's background sync attempt.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -32,14 +45,16 @@ object NetworkModule {
     @Singleton
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor = Interceptor { chain ->
         val request = chain.request()
+        val isUnauthenticatedRoute = UNAUTHENTICATED_PATHS.any { request.url.encodedPath.endsWith(it) }
+        val hasExplicitAuthHeader = request.header("Authorization") != null
         val token = sessionManager.currentAccessToken()
-        val authed = if (!token.isNullOrBlank() && !request.url.encodedPath.endsWith("auth/attendant/login")) {
+        val authed = if (!isUnauthenticatedRoute && !hasExplicitAuthHeader && !token.isNullOrBlank()) {
             request.newBuilder().header("Authorization", "Bearer $token").build()
         } else {
             request
         }
         val response: Response = chain.proceed(authed)
-        if (response.code == 401 && !request.url.encodedPath.endsWith("auth/attendant/login")) {
+        if (response.code == 401 && !isUnauthenticatedRoute && !hasExplicitAuthHeader) {
             sessionManager.clear()
         }
         response

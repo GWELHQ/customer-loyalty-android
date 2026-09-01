@@ -122,7 +122,7 @@ fun LoginScreen(
                     value = state.employeeId,
                     onValueChange = viewModel::onEmployeeIdChange,
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 14.dp),
-                    placeholder = { Text("e.g. KIS1-042") },
+                    placeholder = { Text("099") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ColorPrimary)
                 )

@@ -11,6 +11,7 @@ import com.example.loyaltyapp.data.remote.dto.LoginResponseDto
 import com.example.loyaltyapp.data.remote.dto.NfcLoginRequestDto
 import com.example.loyaltyapp.data.remote.dto.PagedSalesDto
 import com.example.loyaltyapp.data.remote.dto.PriceDto
+import com.example.loyaltyapp.data.remote.dto.RefreshRequestDto
 import com.example.loyaltyapp.data.remote.dto.SaleRequestDto
 import com.example.loyaltyapp.data.remote.dto.SaleResponseDto
 import com.example.loyaltyapp.data.remote.dto.SmsStatusReportDto
@@ -24,13 +25,14 @@ import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** Attendant login — the only unauthenticated mobile routes. */
+/** Attendant login/refresh — the only unauthenticated mobile routes. */
 interface AuthApi {
     @POST("auth/attendant/login")
     suspend fun login(@Body request: LoginRequestDto): LoginResponseDto
@@ -38,6 +40,10 @@ interface AuthApi {
     /** Badge tap login (handover doc §3.1b) — same response shape/session as PIN login, tap-only, no PIN. */
     @POST("auth/attendant/nfc-login")
     suspend fun nfcLogin(@Body request: NfcLoginRequestDto): LoginResponseDto
+
+    /** Silent refresh (handover doc §3.1c) — mints a fresh accessToken + rotated refreshToken, no PIN. Used to sync a logged-out attendant's queued work in the background (see AttendantSyncAuthenticator). */
+    @POST("auth/attendant/refresh")
+    suspend fun refresh(@Body request: RefreshRequestDto): LoginResponseDto
 }
 
 /**
@@ -93,17 +99,29 @@ interface MobileApi {
     @POST("mobile/sync")
     suspend fun sync(@Body request: SyncRequestDto): SyncResponseDto
 
+    /** Same route as [sync], with an explicit bearer token — used only to flush a *non-foreground* attendant's queue in the background (see AttendantSyncAuthenticator), so the implicit current-session token from the auth interceptor is never used by mistake. */
+    @POST("mobile/sync")
+    suspend fun syncAs(@Header("Authorization") bearer: String, @Body request: SyncRequestDto): SyncResponseDto
+
     @GET("mobile/sync-status")
     suspend fun syncStatus(): List<SyncOperationDto>
 
     @POST("mobile/customer-registrations")
     suspend fun registerCustomer(@Body request: CustomerRegistrationRequestDto): CustomerRegistrationResponseDto
 
+    /** Same route as [registerCustomer], with an explicit bearer token — see [syncAs]. */
+    @POST("mobile/customer-registrations")
+    suspend fun registerCustomerAs(@Header("Authorization") bearer: String, @Body request: CustomerRegistrationRequestDto): CustomerRegistrationResponseDto
+
     @GET("mobile/daily-summary")
     suspend fun dailySummary(@Query("date") date: String? = null): DailySummaryResponseDto
 
     @GET("mobile/sales/mine")
     suspend fun salesMine(@Query("date") date: String? = null): PagedSalesDto
+
+    /** Same route as [salesMine], with an explicit bearer token — see [syncAs]. Used by `CustomerRegistrationRepository.reconcileApprovals` to poll approval status for a non-foreground attendant's still-SUBMITTED registrations. */
+    @GET("mobile/sales/mine")
+    suspend fun salesMineAs(@Header("Authorization") bearer: String, @Query("date") date: String? = null): PagedSalesDto
 
     /**
      * Fire-and-forget: reports the outcome of this app's own direct-to-Africa's-Talking SMS send

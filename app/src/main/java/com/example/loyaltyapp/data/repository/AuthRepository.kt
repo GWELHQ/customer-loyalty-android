@@ -1,6 +1,7 @@
 package com.example.loyaltyapp.data.repository
 
 import com.example.loyaltyapp.core.result.AppResult
+import com.example.loyaltyapp.core.session.AttendantCredentialStore
 import com.example.loyaltyapp.core.session.AttendantSession
 import com.example.loyaltyapp.core.session.SessionManager
 import com.example.loyaltyapp.data.remote.NetworkErrors
@@ -16,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val credentialStore: AttendantCredentialStore
 ) {
     val session: StateFlow<AttendantSession?> = sessionManager.session
 
@@ -28,6 +30,7 @@ class AuthRepository @Inject constructor(
         return try {
             val dto = authApi.login(LoginRequestDto(employeeId = employeeId.trim(), pin = pin.trim()))
             sessionManager.save(dto, capturedAtMillis = System.currentTimeMillis())
+            credentialStore.upsert(dto)
             AppResult.Success(sessionManager.currentSession()!!)
         } catch (e: HttpException) {
             AppResult.Failure(NetworkErrors.messageFor(e, "Could not sign in. Check your employee ID and PIN."), e)
@@ -47,6 +50,7 @@ class AuthRepository @Inject constructor(
         return try {
             val dto = authApi.nfcLogin(NfcLoginRequestDto(tagId = tagId))
             sessionManager.save(dto, capturedAtMillis = System.currentTimeMillis())
+            credentialStore.upsert(dto)
             AppResult.Success(sessionManager.currentSession()!!)
         } catch (e: HttpException) {
             AppResult.Failure(NetworkErrors.messageFor(e, "Badge not recognized. Contact your supervisor, or sign in with your employee ID and PIN."), e)
@@ -58,9 +62,10 @@ class AuthRepository @Inject constructor(
     }
 
     /**
-     * Signs the attendant out. Callers must confirm with the attendant first when there are
-     * pending sales still on this device — sign-out never discards them, but this app only
-     * reaches the office from the device that captured the sale.
+     * Signs the attendant out of the UI only — deliberately does NOT touch
+     * [AttendantCredentialStore]. Any pending sales/registrations keep syncing in the background
+     * via that attendant's retained refresh token (see AttendantSyncAuthenticator) even after
+     * this returns; nothing is discarded.
      */
     fun signOut() {
         sessionManager.clear()

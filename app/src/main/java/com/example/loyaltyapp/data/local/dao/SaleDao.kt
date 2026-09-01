@@ -44,4 +44,8 @@ interface SaleDao {
 
     @Query("SELECT COUNT(*) FROM sales WHERE syncStatus IN ('PENDING', 'SYNCING', 'FAILED')")
     fun observePendingCount(): Flow<Int>
+
+    /** Used by AttendantCredentialGarbageCollector to decide whether an attendant's retained refresh token is still needed. */
+    @Query("SELECT COUNT(*) FROM sales WHERE attendantId = :attendantId AND syncStatus IN ('PENDING', 'FAILED')")
+    suspend fun countPendingOrFailedForAttendant(attendantId: String): Int
 }

@@ -30,7 +30,14 @@ data class AttendantDto(
 @Serializable
 data class LoginResponseDto(
     val accessToken: String,
+    val refreshToken: String,
     val attendant: AttendantDto
+)
+
+/** Silent refresh (handover doc §3.1c) — exchanges a still-valid refreshToken for a fresh accessToken, no PIN. */
+@Serializable
+data class RefreshRequestDto(
+    val refreshToken: String
 )
 
 // ---- Bootstrap / station / prices --------------------------------------

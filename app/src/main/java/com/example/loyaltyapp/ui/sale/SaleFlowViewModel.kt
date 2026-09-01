@@ -386,6 +386,7 @@ class SaleFlowViewModel @Inject constructor(
                 val wasOffline = !state.isOnline
                 val registration = customerRegistrationRepository.submit(
                     NewCustomerRegistrationInput(
+                        attendantId = state.attendantId,
                         fullName = state.newCustomerName.trim(),
                         phoneNumber = normalized.e164,
                         product = product,
@@ -434,7 +435,21 @@ class SaleFlowViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Ends the shift on this device after a completed sale/registration — every exit from the
+     * success screen signs out (product ask, handover session 2026-09-01), even this one, so a
+     * shared/handed-off register never stays authenticated as the previous attendant for a next
+     * sale. The record just submitted is already durably queued locally (and, if online, likely
+     * already synced) and keeps syncing in the background via the attendant's retained refresh
+     * token regardless (see AttendantSyncAuthenticator) — nothing here discards it, this only
+     * ends the UI session.
+     */
+    fun signOutAfterSale() {
+        authRepository.signOut()
+    }
+
     fun recordAnother() {
+        signOutAfterSale()
         _uiState.update {
             it.copy(
                 screen = SaleScreen.LOOKUP,

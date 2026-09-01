@@ -4,6 +4,8 @@ import com.example.loyaltyapp.core.cashback.CashbackCalculator
 import com.example.loyaltyapp.core.cashback.SaleCalculation
 import com.example.loyaltyapp.core.connectivity.ConnectivityObserver
 import com.example.loyaltyapp.core.phone.PhoneNumber
+import com.example.loyaltyapp.core.session.AttendantSyncAuthenticator
+import com.example.loyaltyapp.core.session.TokenResult
 import com.example.loyaltyapp.core.sms.AfricasTalkingSmsSender
 import com.example.loyaltyapp.core.sms.SmsSendResult
 import com.example.loyaltyapp.data.local.dao.SaleDao
@@ -18,6 +20,7 @@ import com.example.loyaltyapp.data.remote.dto.SaleRequestDto
 import com.example.loyaltyapp.data.remote.dto.SaleResponseDto
 import com.example.loyaltyapp.data.remote.dto.SmsStatusReportDto
 import com.example.loyaltyapp.data.remote.dto.SyncRequestDto
+import com.example.loyaltyapp.data.remote.dto.SyncResponseDto
 import kotlinx.coroutines.flow.Flow
 import retrofit2.HttpException
 import java.math.BigDecimal
@@ -49,7 +52,8 @@ class SaleRepository @Inject constructor(
     private val mobileApi: MobileApi,
     private val connectivityObserver: ConnectivityObserver,
     private val smsSender: AfricasTalkingSmsSender,
-    private val customerRepository: CustomerRepository
+    private val customerRepository: CustomerRepository,
+    private val attendantSyncAuthenticator: AttendantSyncAuthenticator
 ) {
 
     fun calculationFor(input: NewSaleInput): SaleCalculation {
@@ -155,8 +159,17 @@ class SaleRepository @Inject constructor(
 
     /**
      * Flushes every PENDING/FAILED sale via the batched `/mobile/sync` endpoint (≤500/call),
-     * then updates each local row from its own per-item result — a 200 response can still
-     * contain individually rejected rows.
+     * grouped by [SaleEntity.attendantId] and synced **once per attendant, sequentially** — the
+     * backend has no per-item attendant field, so a call always attributes its whole batch to
+     * whichever token made it (handover doc §5.6). The attendant currently signed into the UI
+     * uses their live token via the implicit-auth [MobileApi.sync]; any other attendant (queued
+     * offline, then auto-logged-out) gets a token via [AttendantSyncAuthenticator], silently
+     * refreshed from their retained refresh token, and syncs via the explicit-header
+     * [MobileApi.syncAs] so the interceptor's current-session token is never substituted in by
+     * mistake. Each local row is updated from its own per-item result — a 200 response can still
+     * contain individually rejected rows. Retained refresh tokens are pruned separately, once
+     * both this and registration retries have run for the tick (see
+     * [com.example.loyaltyapp.core.session.AttendantCredentialGarbageCollector]) — not here.
      */
     suspend fun syncAllPending(): Int {
         if (!connectivityObserver.currentlyOnline()) return 0
@@ -164,49 +177,75 @@ class SaleRepository @Inject constructor(
         if (pending.isEmpty()) return 0
 
         var succeeded = 0
-        pending.chunked(SYNC_BATCH_SIZE).forEach { batch ->
-            batch.forEach { saleDao.update(it.copy(syncStatus = SyncStatus.SYNCING)) }
-            try {
-                val response = mobileApi.sync(SyncRequestDto(sales = batch.map { it.toRequestDto() }))
-                val byLocalId = batch.associateBy { it.localSaleId }
-                val byIdempotencyKey = batch.associateBy { it.idempotencyKey }
-                response.results.forEach { result ->
-                    val original = result.clientLocalId?.let { byLocalId[it] } ?: byIdempotencyKey[result.idempotencyKey]
-                    if (original != null) {
-                        var updated = applySyncResult(original, result.result, result.saleId, result.errorReason)
-                        if (updated.syncStatus == SyncStatus.SYNCED || updated.syncStatus == SyncStatus.NEEDS_REVIEW) {
-                            succeeded++
-                            // customerPhone/cashbackEarned/monthToDateCashback are only present on
-                            // "accepted"/"needs_review" results that actually created a sale —
-                            // "already_processed" (and the guard below) keep this a one-shot send.
-                            val saleId = result.saleId
-                            if (original.smsStatus == SmsStatus.PENDING && saleId != null) {
-                                val smsStatus = sendSaleSmsAndReport(
-                                    saleId = saleId,
-                                    phone = result.customerPhone,
-                                    cashbackEarned = result.cashbackEarned,
-                                    monthToDateCashback = result.monthToDateCashback
+        pending.groupBy { it.attendantId }.forEach { (attendantId, attendantSales) ->
+            when (val tokenResult = attendantSyncAuthenticator.accessTokenFor(attendantId)) {
+                TokenResult.Unavailable, TokenResult.SessionDead -> Unit
+                is TokenResult.Available -> {
+                    attendantSales.chunked(SYNC_BATCH_SIZE).forEach { batch ->
+                        succeeded += syncBatch(batch) {
+                            if (tokenResult.isForegroundSession) {
+                                mobileApi.sync(SyncRequestDto(sales = batch.map { it.toRequestDto() }))
+                            } else {
+                                mobileApi.syncAs(
+                                    bearer = "Bearer ${tokenResult.accessToken}",
+                                    request = SyncRequestDto(sales = batch.map { it.toRequestDto() })
                                 )
-                                if (smsStatus != null) updated = updated.copy(smsStatus = smsStatus)
                             }
                         }
-                        saleDao.update(updated)
                     }
-                }
-            } catch (e: Exception) {
-                batch.forEach {
-                    saleDao.update(
-                        it.copy(
-                            syncStatus = SyncStatus.FAILED,
-                            lastSyncErrorMessage = "Could not reach the office. It will try again automatically, or tap Sync now.",
-                            syncAttempts = it.syncAttempts + 1
-                        )
-                    )
                 }
             }
         }
         return succeeded
     }
+
+    private suspend fun syncBatch(batch: List<SaleEntity>, call: suspend () -> SyncResponseDto): Int {
+        batch.forEach { saleDao.update(it.copy(syncStatus = SyncStatus.SYNCING)) }
+        var succeeded = 0
+        try {
+            val response = call()
+            val byLocalId = batch.associateBy { it.localSaleId }
+            val byIdempotencyKey = batch.associateBy { it.idempotencyKey }
+            response.results.forEach { result ->
+                val original = result.clientLocalId?.let { byLocalId[it] } ?: byIdempotencyKey[result.idempotencyKey]
+                if (original != null) {
+                    var updated = applySyncResult(original, result.result, result.saleId, result.errorReason)
+                    if (updated.syncStatus == SyncStatus.SYNCED || updated.syncStatus == SyncStatus.NEEDS_REVIEW) {
+                        succeeded++
+                        // customerPhone/cashbackEarned/monthToDateCashback are only present on
+                        // "accepted"/"needs_review" results that actually created a sale —
+                        // "already_processed" (and the guard below) keep this a one-shot send.
+                        val saleId = result.saleId
+                        if (original.smsStatus == SmsStatus.PENDING && saleId != null) {
+                            val smsStatus = sendSaleSmsAndReport(
+                                saleId = saleId,
+                                phone = result.customerPhone,
+                                cashbackEarned = result.cashbackEarned,
+                                monthToDateCashback = result.monthToDateCashback
+                            )
+                            if (smsStatus != null) updated = updated.copy(smsStatus = smsStatus)
+                        }
+                    }
+                    saleDao.update(updated)
+                }
+            }
+        } catch (e: Exception) {
+            batch.forEach {
+                saleDao.update(
+                    it.copy(
+                        syncStatus = SyncStatus.FAILED,
+                        lastSyncErrorMessage = "Could not reach the office. It will try again automatically, or tap Sync now.",
+                        syncAttempts = it.syncAttempts + 1
+                    )
+                )
+            }
+        }
+        return succeeded
+    }
+
+    /** Used by AttendantCredentialGarbageCollector to decide whether an attendant's retained refresh token is still needed. */
+    suspend fun countPendingOrFailedForAttendant(attendantId: String): Int =
+        saleDao.countPendingOrFailedForAttendant(attendantId)
 
     private fun applySyncResult(sale: SaleEntity, result: String, saleId: String?, errorReason: String?): SaleEntity =
         when (result) {

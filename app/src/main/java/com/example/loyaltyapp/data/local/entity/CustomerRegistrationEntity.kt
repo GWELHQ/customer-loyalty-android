@@ -24,6 +24,9 @@ data class CustomerRegistrationEntity(
     val idempotencyKey: String,
     val serverRequestId: String?,
 
+    /** Blank for rows queued before this column existed (see LoyaltyDatabase MIGRATION_4_5) — retryAllPending() falls back to the old implicit-session behavior for those. */
+    val attendantId: String,
+
     val customerFullName: String,
     val customerPhoneNumber: String,
     val product: Product,

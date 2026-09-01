@@ -22,7 +22,10 @@ import com.example.loyaltyapp.data.local.entity.StationEntity
         SaleEntity::class,
         CustomerRegistrationEntity::class
     ],
-    version = 4, // licensePlateNumber (String?) -> licensePlateNumbers (List<String>); destructive migration wipes and re-syncs the cheap customer cache
+    // v4: licensePlateNumber (String?) -> licensePlateNumbers (List<String>); destructive migration wipes and re-syncs the cheap customer cache.
+    // v5: customer_registrations gained attendantId — real, additive Migration(4, 5) in DatabaseModule (NOT destructive): unlike the
+    // customer cache, sales/registrations queued offline are not re-syncable if wiped, so this one preserves existing rows.
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

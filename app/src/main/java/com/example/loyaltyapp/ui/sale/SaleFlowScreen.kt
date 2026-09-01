@@ -54,7 +54,7 @@ fun SaleFlowScreen(
                 SuccessScreen(
                     state = state,
                     onRecordAnother = viewModel::recordAnother,
-                    onGoToday = onGoToday,
+                    onGoToday = { viewModel.signOutAfterSale() },
                     onRefreshRegistration = viewModel::refreshRegistrationStatus
                 )
             }
@@ -121,7 +121,7 @@ fun SaleFlowScreen(
                     SaleScreen.SUCCESS -> SuccessScreen(
                         state = state,
                         onRecordAnother = viewModel::recordAnother,
-                        onGoToday = onGoToday
+                        onGoToday = { viewModel.signOutAfterSale() }
                     )
                 }
             }
