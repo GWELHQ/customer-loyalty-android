@@ -62,7 +62,13 @@ class CustomerRepository @Inject constructor(
                     limit = CUSTOMER_SYNC_PAGE_LIMIT,
                     updatedSince = updatedSince
                 )
-                if (response.items.isNotEmpty()) customerDao.upsertAll(response.items.map { it.toEntity() })
+                // A soft-deleted customer (server sets deletedAt instead of hard-deleting, so
+                // this delta pull actually sees it as a change) is removed locally instead of
+                // upserted — otherwise it would linger in the cache forever on any device that
+                // had already synced it.
+                val (deleted, active) = response.items.partition { it.deletedAt != null }
+                deleted.forEach { customerDao.deleteById(it.id) }
+                if (active.isNotEmpty()) customerDao.upsertAll(active.map { it.toEntity() })
                 cursor = response.nextCursor
             } while (cursor != null)
 
@@ -92,24 +98,38 @@ class CustomerRepository @Inject constructor(
     suspend fun findByPhone(phoneNumber: String): CustomerEntity? = customerDao.findByPhone(phoneNumber)
 
     /**
-     * Resolves a scanned QR code (the code is simply the customer's own id) — cache-first, then
-     * an authoritative remote lookup so a code minted after this device's last sync still works.
-     * Null means "not found or couldn't reach the office"; callers can't distinguish the two,
-     * matching how a QR code that doesn't resolve should be handled either way (ask to retry / use
-     * phone lookup instead — there's nothing to "confirm not found" here the way phone search has).
+     * Resolves a scanned QR code (the code is simply the customer's own id) — network-first when
+     * online so an admin-side edit (e.g. a renamed customer) is never shown stale just because
+     * this device already had that customer cached; falls back to the local cache when offline or
+     * when the request fails for a reason other than "definitely doesn't exist," and to a fresh
+     * remote lookup so a code minted after this device's last sync still works. A 404 (customer
+     * deleted, or a soft-deleted customer since the backend's own findById treats those as
+     * not-found too) is NOT a fall-back case — it means the customer is genuinely gone, so the
+     * stale cached row is dropped instead of being returned. Null means "not found or couldn't
+     * reach the office"; callers can't distinguish the two, matching how a QR code that doesn't
+     * resolve should be handled either way (ask to retry / use phone lookup instead — there's
+     * nothing to "confirm not found" here the way phone search has).
      */
     suspend fun findById(customerId: String): CustomerEntity? {
-        customerDao.getById(customerId)?.let { return it }
-        if (!connectivityObserver.currentlyOnline()) return null
-        return try {
-            val remote = mobileApi.getCustomerById(customerId)
-            val entity = remote.toEntity()
-            customerDao.upsert(entity)
-            entity
-        } catch (e: Exception) {
-            android.util.Log.w("CustomerRepository", "findById($customerId) failed: ${e::class.simpleName} ${e.message}", e)
-            null
+        if (connectivityObserver.currentlyOnline()) {
+            try {
+                val remote = mobileApi.getCustomerById(customerId)
+                val entity = remote.toEntity()
+                customerDao.upsert(entity)
+                return entity
+            } catch (e: retrofit2.HttpException) {
+                if (e.code() == 404) {
+                    customerDao.deleteById(customerId)
+                    return null
+                }
+                android.util.Log.w("CustomerRepository", "findById($customerId) failed: ${e::class.simpleName} ${e.message}", e)
+                // fall through to the local cache below
+            } catch (e: Exception) {
+                android.util.Log.w("CustomerRepository", "findById($customerId) failed: ${e::class.simpleName} ${e.message}", e)
+                // fall through to the local cache below
+            }
         }
+        return customerDao.getById(customerId)
     }
 
     /** Resolves a tapped NFC tag's UID to a customer. Always a live lookup — tags are assigned from the web admin, so there's nothing useful to cache locally by tag id. */

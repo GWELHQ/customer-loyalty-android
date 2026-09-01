@@ -29,4 +29,8 @@ interface CustomerDao {
 
     @Query("SELECT COUNT(*) FROM customers")
     suspend fun count(): Int
+
+    /** Removes a customer soft-deleted server-side (see [CustomerRepository.syncCustomers], [CustomerRepository.findById]) so it stops showing up in search/lookup. */
+    @Query("DELETE FROM customers WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

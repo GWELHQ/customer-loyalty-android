@@ -98,7 +98,11 @@ data class CustomerDto(
     // Both are optional per-customer extras added by staff from the web admin, with no in-app
     // registration flow for either.
     val licensePlateNumbers: List<String> = emptyList(),
-    val nfcTagId: String? = null
+    val nfcTagId: String? = null,
+    /** Set when the customer was soft-deleted server-side — GET /mobile/customers?updatedSince=
+     * surfaces this like any other change so the delta sync can drop the local copy instead of
+     * upserting it. Never set for an active customer. */
+    val deletedAt: String? = null
 )
 
 /** Response for `GET /mobile/customers` — full/incremental customer sync, paginated. */

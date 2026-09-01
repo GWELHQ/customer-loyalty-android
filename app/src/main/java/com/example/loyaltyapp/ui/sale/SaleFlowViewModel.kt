@@ -2,6 +2,7 @@ package com.example.loyaltyapp.ui.sale
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.loyaltyapp.common.FeatureFlags
 import com.example.loyaltyapp.core.connectivity.ConnectivityObserver
 import com.example.loyaltyapp.core.notify.RegistrationApprovalNotifier
 import com.example.loyaltyapp.core.phone.PhoneNumber
@@ -159,10 +160,11 @@ class SaleFlowViewModel @Inject constructor(
      * Every keystroke only filters the local cache (see [SaleUiState.matches], backed by
      * [CustomerRepository.searchLocal]) — no network call. Only once a full national number is
      * entered (9 significant digits, however the attendant typed it — 07xxxxxxxx, 01xxxxxxxx,
-     * 7xxxxxxxx, or 1xxxxxxxx) do we check the server, and only if that number isn't already
-     * cached locally: the real "not found ⇒ register" decision (§4.2/4.4 of the handover) needs
-     * a live round trip to be trustworthy, but there's no point spending one on a number the
-     * phone already knows.
+     * 7xxxxxxxx, or 1xxxxxxxx) do we check the server. Always hits the server when online, even if
+     * the number is already cached locally — an admin-side edit (e.g. a renamed customer) must not
+     * stay stale just because this phone has seen the number before; the real "not found ⇒
+     * register" decision (§4.2/4.4 of the handover) needs a live round trip to be trustworthy
+     * regardless. Offline, falls back to whatever the local cache already knows.
      */
     private fun checkFullNumberIfNeeded() {
         val state = _uiState.value
@@ -172,23 +174,24 @@ class SaleFlowViewModel @Inject constructor(
         viewModelScope.launch {
             val normalized = PhoneNumber.normalize(digits)
             val cachedLocally = normalized?.let { customerRepository.findByPhone(it.e164) } != null
-            if (cachedLocally) return@launch
 
             val wasOnline = connectivityObserver.currentlyOnline()
-            val remote = customerRepository.searchRemoteExact(national)
+            val remote = if (wasOnline) customerRepository.searchRemoteExact(national) else null
             val stillCurrent = _uiState.value.queryDigits == digits
             if (!stillCurrent) return@launch
 
             when {
                 remote != null -> _uiState.update { it.copy(confirmedNotFound = remote.isEmpty(), lookupFailed = false) }
+                cachedLocally -> _uiState.update { it.copy(confirmedNotFound = false, lookupFailed = false) }
                 !wasOnline -> _uiState.update {
                     // Genuinely offline: fall back to whatever the local cache already knows.
                     it.copy(confirmedNotFound = it.matches.isEmpty(), lookupFailed = false)
                 }
                 else -> {
-                    // Online, but the lookup call itself failed (timeout, 5xx, rate limit, ...).
-                    // Never claim "not found" here — that would route a real customer into a
-                    // duplicate "create" registration. Surface a distinct retryable error instead.
+                    // Online, but the lookup call itself failed (timeout, 5xx, rate limit, ...),
+                    // and this number wasn't already cached either. Never claim "not found" here —
+                    // that would route a real customer into a duplicate "create" registration.
+                    // Surface a distinct retryable error instead.
                     _uiState.update { it.copy(confirmedNotFound = false, lookupFailed = true) }
                 }
             }
@@ -263,7 +266,11 @@ class SaleFlowViewModel @Inject constructor(
             it.copy(
                 customer = customer,
                 isNewCustomerRegistration = false,
-                screen = SaleScreen.PLATE_CHECK,
+                // Plate-check OCR is disabled server-side (see FeatureFlags) — skip straight to
+                // ENTRY rather than a step that would only 400 against
+                // POST /mobile/vehicle-plate-checks. plateCheck stays null, so no plateCheckId
+                // is ever attached to the sale.
+                screen = if (FeatureFlags.PLATE_CHECK_ENABLED) SaleScreen.PLATE_CHECK else SaleScreen.ENTRY,
                 plateCheck = null,
                 plateCheckFailed = false,
                 product = null,
