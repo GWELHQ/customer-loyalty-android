@@ -2,10 +2,11 @@ package com.example.loyaltyapp.ui.auth
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -78,6 +79,7 @@ fun LoginScreen(
             .fillMaxSize()
             .background(GwBlue500)
             .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -98,23 +100,11 @@ fun LoginScreen(
         Text("Pump attendant app", color = com.example.loyaltyapp.ui.theme.GwBlue100, fontSize = 14.sp, modifier = Modifier.padding(bottom = 24.dp))
 
         GwCard {
-            // Two independent ways to obtain a session (handover doc §3.1/§3.1b) — a plain mode
-            // toggle, not a wizard step; switching modes never loses what's typed in the other.
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LoginModeTab(
-                    text = "Tap badge",
-                    selected = state.loginMode == LoginMode.BADGE,
-                    onClick = { viewModel.setLoginMode(LoginMode.BADGE) },
-                    modifier = Modifier.weight(1f)
-                )
-                LoginModeTab(
-                    text = "ID + PIN",
-                    selected = state.loginMode == LoginMode.PIN,
-                    onClick = { viewModel.setLoginMode(LoginMode.PIN) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Box(modifier = Modifier.padding(top = 16.dp)) {}
+            // Badge/NFC login is disabled server-side for now (backend feature flag) — the mode
+            // toggle that used to sit here is hidden, and LoginUiState defaults to LoginMode.PIN,
+            // so this whole card is effectively PIN-only. BadgeLoginFields and LoginModeTab below
+            // are kept intact, not deleted, so re-enabling is just restoring the toggle Row here
+            // once the flag flips back on.
 
             if (state.loginMode == LoginMode.PIN) {
                 Text("Employee ID", fontWeight = FontWeight.Bold, fontSize = 13.sp)

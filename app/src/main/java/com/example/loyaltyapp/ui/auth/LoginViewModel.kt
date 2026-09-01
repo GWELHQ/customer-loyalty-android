@@ -27,7 +27,9 @@ data class LoginUiState(
     val error: String? = null,
     val restoredSession: AttendantSession? = null,
     val isRestoring: Boolean = true,
-    val loginMode: LoginMode = LoginMode.BADGE,
+    // PIN, not BADGE: badge/NFC login is disabled server-side for now (backend feature flag), and
+    // its tab is hidden in LoginScreen — defaulting here to what's actually usable.
+    val loginMode: LoginMode = LoginMode.PIN,
     /** Brief check/X feedback shown right after a badge tap resolves, before navigating away. */
     val scanResult: ScanResultUi? = null
 )
