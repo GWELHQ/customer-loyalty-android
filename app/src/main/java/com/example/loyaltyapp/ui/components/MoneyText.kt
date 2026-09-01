@@ -7,6 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import com.example.loyaltyapp.core.money.Money
 import com.example.loyaltyapp.ui.theme.MonoFontFamily
@@ -20,7 +22,10 @@ fun TabularText(
     color: Color = Color.Unspecified,
     fontSize: TextUnit = TextUnit.Unspecified,
     fontWeight: FontWeight? = null,
-    style: TextStyle = LocalTextStyle.current
+    style: TextStyle = LocalTextStyle.current,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    textAlign: TextAlign? = null
 ) {
     Text(
         text = text,
@@ -28,7 +33,10 @@ fun TabularText(
         color = color,
         fontSize = fontSize,
         fontWeight = fontWeight,
-        style = style.copy(fontFamily = MonoFontFamily, fontFeatureSettings = "tnum")
+        style = style.copy(fontFamily = MonoFontFamily, fontFeatureSettings = "tnum"),
+        maxLines = maxLines,
+        overflow = overflow,
+        textAlign = textAlign
     )
 }
 

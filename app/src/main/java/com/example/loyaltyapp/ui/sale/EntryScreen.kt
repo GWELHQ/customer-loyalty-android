@@ -28,6 +28,7 @@ import com.example.loyaltyapp.core.money.Money
 import com.example.loyaltyapp.data.local.entity.Product
 import com.example.loyaltyapp.ui.components.GwCard
 import com.example.loyaltyapp.ui.components.NumericKeypad
+import com.example.loyaltyapp.ui.theme.MinTouchTarget
 import com.example.loyaltyapp.ui.components.PrimaryButton
 import com.example.loyaltyapp.ui.components.TabularText
 import com.example.loyaltyapp.ui.theme.ColorBorder
@@ -151,7 +152,7 @@ fun EntryScreen(
                     }
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(MinTouchTarget)
                             .border(1.dp, ColorBorder, RoundedCornerShape(8.dp))
                             .clickable(onClick = onClearAmount),
                         contentAlignment = Alignment.Center

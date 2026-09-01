@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -82,7 +83,7 @@ fun QrScanScreen(
 
         if (scanResult != null) {
             Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f),
+                modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f).heightIn(max = 460.dp),
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
                 ScanResultOverlay(scanResult)
@@ -92,6 +93,7 @@ fun QrScanScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(3f / 4f)
+                    .heightIn(max = 460.dp)
                     .background(ColorText, RoundedCornerShape(16.dp))
             ) {
                 QrCameraPreview(onCodeScanned = onCodeScanned)

@@ -13,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.loyaltyapp.core.money.Money
@@ -85,8 +87,16 @@ fun ReviewScreen(
                         .padding(horizontal = 14.dp, vertical = 13.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(label, color = ColorTextSecondary, fontSize = 13.sp)
-                    TabularText(value, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(label, color = ColorTextSecondary, fontSize = 13.sp, modifier = Modifier.weight(0.4f))
+                    TabularText(
+                        value,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(0.6f)
+                    )
                 }
             }
             Row(modifier = Modifier.fillMaxWidth().background(ColorSurfaceSunken).padding(14.dp)) {

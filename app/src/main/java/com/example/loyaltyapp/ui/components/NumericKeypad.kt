@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,6 +82,7 @@ private fun KeypadKey(label: String, modifier: Modifier = Modifier, onClick: () 
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(2.1f)
+            .heightIn(max = 64.dp)
             .background(if (enabled) ColorSurface else Color.Transparent, shape)
             .then(if (enabled) Modifier.border(1.dp, ColorBorder, shape) else Modifier)
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
