@@ -57,6 +57,26 @@ class SessionManager @Inject constructor(
         _session.value = readFromPrefs()
     }
 
+    /**
+     * Restores a session locally, with no fresh tokens from the server — used when
+     * [AttendantCredentialStore.verifyPinOffline] succeeds while offline. Seeds [KEY_TOKEN] with
+     * the retained credential's last known accessToken, which is likely stale; that's fine, since
+     * no foreground network call happens while genuinely offline, and the very first real call
+     * once back online either still works or 401s and cleanly bounces back to login (see the auth
+     * interceptor in NetworkModule) — no special-casing needed here.
+     */
+    fun saveOffline(credential: RetainedCredential, capturedAtMillis: Long) {
+        prefs.edit(commit = true) {
+            putString(KEY_ATTENDANT_ID, credential.attendantId)
+            putString(KEY_EMPLOYEE_ID, credential.employeeId)
+            putString(KEY_FULL_NAME, credential.fullName)
+            putString(KEY_STATION_ID, credential.assignedStationId)
+            putString(KEY_TOKEN, credential.lastAccessToken)
+            putLong(KEY_ISSUED_AT, capturedAtMillis)
+        }
+        _session.value = readFromPrefs()
+    }
+
     fun clear() {
         prefs.edit(commit = true) { clear() }
         _session.value = null

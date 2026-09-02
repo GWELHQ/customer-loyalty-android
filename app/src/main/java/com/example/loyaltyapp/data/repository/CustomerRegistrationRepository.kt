@@ -144,10 +144,6 @@ class CustomerRegistrationRepository @Inject constructor(
         }
     }
 
-    /** Used by AttendantCredentialGarbageCollector to decide whether an attendant's retained refresh token is still needed. */
-    suspend fun countUnresolvedForAttendant(attendantId: String): Int =
-        registrationDao.countUnresolvedForAttendant(attendantId)
-
     suspend fun getById(localId: String): CustomerRegistrationEntity? = registrationDao.getById(localId)
 
     fun observeById(localId: String): Flow<CustomerRegistrationEntity?> = registrationDao.observeById(localId)

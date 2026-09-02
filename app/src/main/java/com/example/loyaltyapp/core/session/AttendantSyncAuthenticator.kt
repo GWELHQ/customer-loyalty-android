@@ -43,7 +43,7 @@ class AttendantSyncAuthenticator @Inject constructor(
         val stored = credentialStore.get(attendantId) ?: return TokenResult.Unavailable
         return try {
             val dto = authApi.refresh(RefreshRequestDto(stored.refreshToken))
-            credentialStore.upsert(dto)
+            credentialStore.upsertAfterRefresh(dto)
             TokenResult.Available(dto.accessToken, isForegroundSession = false)
         } catch (e: HttpException) {
             if (e.code() == 401) {

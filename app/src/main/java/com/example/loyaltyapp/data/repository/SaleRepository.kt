@@ -167,9 +167,10 @@ class SaleRepository @Inject constructor(
      * refreshed from their retained refresh token, and syncs via the explicit-header
      * [MobileApi.syncAs] so the interceptor's current-session token is never substituted in by
      * mistake. Each local row is updated from its own per-item result — a 200 response can still
-     * contain individually rejected rows. Retained refresh tokens are pruned separately, once
-     * both this and registration retries have run for the tick (see
-     * [com.example.loyaltyapp.core.session.AttendantCredentialGarbageCollector]) — not here.
+     * contain individually rejected rows. Retained refresh tokens are never pruned just because a
+     * queue is caught up — see [com.example.loyaltyapp.core.session.AttendantCredentialStore], an
+     * attendant's local record (including their offline-login PIN hash) needs to persist for a
+     * future shift, not just until the next sync.
      */
     suspend fun syncAllPending(): Int {
         if (!connectivityObserver.currentlyOnline()) return 0
@@ -242,10 +243,6 @@ class SaleRepository @Inject constructor(
         }
         return succeeded
     }
-
-    /** Used by AttendantCredentialGarbageCollector to decide whether an attendant's retained refresh token is still needed. */
-    suspend fun countPendingOrFailedForAttendant(attendantId: String): Int =
-        saleDao.countPendingOrFailedForAttendant(attendantId)
 
     private fun applySyncResult(sale: SaleEntity, result: String, saleId: String?, errorReason: String?): SaleEntity =
         when (result) {
