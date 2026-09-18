@@ -72,7 +72,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideJson(): Json = Json { ignoreUnknownKeys = true }
+    // coerceInputValues: a non-nullable field with a default (e.g. CustomerDto.totalCashbackEarned,
+    // licensePlateNumbers) can come back as an explicit JSON `null` for a freshly created record
+    // instead of the key being omitted — without this, that throws and gets swallowed by callers'
+    // generic catch blocks, which was surfacing as "customer not found" for brand-new customers.
+    fun provideJson(): Json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     @Provides
     @Singleton

@@ -25,6 +25,10 @@ class CustomerRefreshWorker @AssistedInject constructor(
             customerRepository.syncCustomers()
             Result.success()
         } catch (e: Exception) {
+            // Previously swallowed with no trace at all — a bad response (e.g. a malformed
+            // customer record) could stall this worker on Result.retry() forever with nothing
+            // in Logcat to explain why. Now at least visible if a device is being debugged.
+            android.util.Log.w("CustomerRefreshWorker", "syncCustomers() failed: ${e::class.simpleName} ${e.message}", e)
             Result.retry()
         }
     }
