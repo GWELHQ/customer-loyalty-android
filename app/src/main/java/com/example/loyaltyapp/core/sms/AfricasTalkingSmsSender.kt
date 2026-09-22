@@ -61,8 +61,8 @@ class AfricasTalkingSmsSender @Inject constructor(
         .build()
 
     /** Must match the backend's canonical template exactly — same text staff see in the web admin audit trail. */
-    fun buildMessage(cashbackEarned: Double, monthToDateCashback: Double): String =
-        "Green Wells: You earned KES ${formatWhole(cashbackEarned)} cashback. Your total this month is KES ${formatWhole(monthToDateCashback)}."
+    fun buildMessage(amountPaid: Double, cashbackEarned: Double, monthToDateCashback: Double): String =
+        "Green Wells: You paid KES ${formatWhole(amountPaid)} and earned KES ${formatWhole(cashbackEarned)} cashback. Your total cashback this month is KES ${formatWhole(monthToDateCashback)}."
 
     /** Cashback figures are always whole shillings — no decimal places to show. */
     private fun formatWhole(value: Double): String = "%.0f".format(value)

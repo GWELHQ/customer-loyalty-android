@@ -119,6 +119,7 @@ class SaleRepository @Inject constructor(
                 sendSaleSmsAndReport(
                     saleId = response.id,
                     phone = response.customerPhoneAtSale,
+                    amountPaid = response.amountPaid,
                     cashbackEarned = response.snapshot.cashbackEarned,
                     monthToDateCashback = response.monthToDateCashback
                 ) ?: parseSmsStatus(response.smsStatus)
@@ -221,6 +222,7 @@ class SaleRepository @Inject constructor(
                             val smsStatus = sendSaleSmsAndReport(
                                 saleId = saleId,
                                 phone = result.customerPhone,
+                                amountPaid = original.amountPaidKes.toDouble(),
                                 cashbackEarned = result.cashbackEarned,
                                 monthToDateCashback = result.monthToDateCashback
                             )
@@ -299,6 +301,7 @@ class SaleRepository @Inject constructor(
     private suspend fun sendSaleSmsAndReport(
         saleId: String,
         phone: String?,
+        amountPaid: Double,
         cashbackEarned: Double?,
         monthToDateCashback: Double?
     ): SmsStatus? {
@@ -307,7 +310,7 @@ class SaleRepository @Inject constructor(
         // cases above, so this is marked NOT_APPLICABLE rather than left PENDING.
         if (cashbackEarned <= 0.0) return SmsStatus.NOT_APPLICABLE
 
-        val message = smsSender.buildMessage(cashbackEarned, monthToDateCashback)
+        val message = smsSender.buildMessage(amountPaid, cashbackEarned, monthToDateCashback)
         val result = smsSender.send(phone, message)
         val report = when (result) {
             is SmsSendResult.Success -> SmsStatusReportDto(success = true, providerResponse = result.providerMessageId)
